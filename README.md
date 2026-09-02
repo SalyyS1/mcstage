@@ -1,5 +1,7 @@
 # mcstage
 
+[![build](https://github.com/SalyyS1/mcstage/actions/workflows/build.yml/badge.svg)](https://github.com/SalyyS1/mcstage/actions/workflows/build.yml)
+
 mcstage boots a real Minecraft server, installs your plugin, types commands into its console, and tells
 you whether the lines you expected showed up. It downloads the server itself, verifies the jar against
 the digest its publisher printed, and reuses it forever after, so the whole thing is one command and one
