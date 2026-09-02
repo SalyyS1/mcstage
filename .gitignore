@@ -1,0 +1,24 @@
+.gradle/
+build/
+out/
+*.class
+
+# Instance directories mcstage creates while testing. The fixtures under src/test/resources are
+# deliberate and stay tracked.
+.mcstage/
+/instances/
+/samples/
+
+# A downloaded server jar has no business in a repository.
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+*.log
+*.log.gz
+!src/test/resources/**/*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.kotlin/

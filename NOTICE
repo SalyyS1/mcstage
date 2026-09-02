@@ -1,0 +1,158 @@
+mcstage
+Copyright 2026 SalyVn (https://github.com/SalyyS1)
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+================================================================================
+Third-party dependencies bundled in the shaded release jar
+================================================================================
+
+Licences below were read from each artifact's published POM on Maven Central.
+
+  SnakeYAML 2.6                           Apache-2.0
+  org.yaml:snakeyaml                      https://bitbucket.org/snakeyaml/snakeyaml
+                                          Used through SafeConstructor, so a
+                                          scenario file is data and nothing in it
+                                          is turned into an object.
+
+  Clikt 5.1.0                             Apache-2.0
+  com.github.ajalt.clikt:clikt            https://github.com/ajalt/clikt
+
+  kotlinx.serialization 1.11.0            Apache-2.0
+  org.jetbrains.kotlinx:kotlinx-serialization-json
+                                          https://github.com/Kotlin/kotlinx.serialization
+
+  Kotlin standard library 2.4.10          Apache-2.0
+  org.jetbrains.kotlin:kotlin-stdlib      https://kotlinlang.org
+
+================================================================================
+Where the facts come from
+================================================================================
+
+This tool makes a small number of claims about how a server behaves, and each was
+established from a primary source rather than from recollection. Line numbers were
+read on 2026-08-25 from the default branch of each repository unless a tag is named.
+
+  Commands typed into a process that has no terminal
+    The whole chain was read, because the design depends on it. Paper replaces
+    vanilla's console reader: org.bukkit.craftbukkit.Main declares useConsole
+    (Main.java:16), and the patch to DedicatedServer starts PaperConsole in place
+    of vanilla's own stdin loop, which the same patch comments out
+    (DedicatedServer.java.patch:42-56, thread started at :117). PaperConsole
+    extends Minecrell's SimpleTerminalConsole and sends each line to
+    handleConsoleInput (PaperConsole.java:13,45-47). SimpleTerminalConsole asks
+    JLine for a system terminal and, when there is none, reads System.in line by
+    line instead (SimpleTerminalConsole.java:137-148,177-184, at tag 1.3.0). JLine
+    only attempts a system terminal when stdin is one (TerminalBuilder.java:472-477
+    at tag jline-3.27.1), which a pipe is not, and TerminalConsoleAppender turns the
+    resulting failure into a single warning about advanced terminal features
+    (TerminalConsoleAppender.java:230-246). handleConsoleInput puts the line on a
+    concurrent queue drained by the tick thread (DedicatedServer.java.patch:290-306),
+    and Folia drains the same queue on its global region tick
+    (0001-Region-Threading-Base.patch:1815). So a piped command arrives, and one
+    sent before the server is ready is queued rather than dropped.
+
+  The line that says a plugin is enabling
+    Read from PaperMC/Paper PaperPluginInstanceManager.java:186-190: the message is
+    "Enabling " followed by the plugin's display name, logged through the plugin's
+    own logger, with a trailing asterisk when the plugin declares no api-version.
+    That is what the scenario key `enabled:` waits for.
+
+  The line that says a server is ready
+    Not sourceable from Paper's repository: it belongs to vanilla code, which Paper
+    does not hold. It was taken from real boots of Paper 1.21.4 and Purpur 1.21.4 on
+    2026-08-25 and is matched on its timing part alone, which is why `ready:` exists
+    as a scenario key. Nothing in this tool claims a source it does not have.
+
+  Matching the initial heap to the maximum
+    From PaperMC/docs (BSD-2-Clause), paper/admin/how-to/aikars-flags.md. mcstage
+    adds no other tuning flag, because a harness has no business having opinions
+    about somebody else's heap.
+
+  Where builds come from
+    PaperMC's fill API v3, verified by request on 2026-08-25: /v3/projects answers a
+    list of projects each carrying its versions grouped by family, newest first, and
+    a build carries downloads["server:default"] with a name, a size, a sha256 and a
+    URL under fill-data addressed by that same digest. Purpur's API v2, verified the
+    same day: /v2/purpur lists versions oldest first, /v2/purpur/{version} carries
+    builds.latest and builds.all, and a build carries a result and an md5. Both are
+    asked with a User-Agent naming this tool, as such APIs ask. Nothing about a
+    scenario, an instance or a plugin is ever sent anywhere.
+
+  The EULA
+    mcstage writes eula=true only when --accept-eula is passed, and never uses the
+    JVM property that bypasses the file. The agreement is the user's to make.
+
+================================================================================
+Prior art
+================================================================================
+
+None of the projects below contributed code to this one. They are credited because
+they solved a neighbouring problem first, and reading them shaped what mcstage does
+and does not try to do. Stars, licences and last-push dates were checked on
+2026-08-25.
+
+  jpenilla/run-task              Apache-2.0   Boots a real Paper, Folia or Velocity
+                                 363 stars    from Gradle, and does it well. The
+                                              closest existing thing to this, and
+                                              the reason mcstage is a CLI: run-task
+                                              belongs to one build tool.
+  MockBukkit/MockBukkit          MIT          A mock server to assert against. The
+                                 742 stars    other half of the problem: it never
+                                              starts a server, so the failures it
+                                              cannot have are the ones here.
+  headlesshq/mc-runtime-test     MIT          Boots the game in CI, on the client
+                                 61 stars     side, headless. Same idea aimed at the
+                                              other end of the connection.
+  itzg/docker-minecraft-server   Apache-2.0   The way most people run a server in a
+                                 14193 stars  container, and the reference for what
+                                              a server directory should look like.
+                                              Aimed at operating a server rather
+                                              than at changing plugin code.
+  Tiiffi/mcrcon                  Zlib         Driving a server console over RCON.
+                                 1075 stars   mcstage uses the process's own stdin
+                                              instead, so there is no port to open
+                                              and no password to invent, but mcrcon
+                                              is why the alternative was understood
+                                              before being ruled out.
+  Minecrell/TerminalConsoleAppender
+                                 MIT          The console layer Paper actually uses,
+                                 81 stars     and the reason piped input works.
+  Minecrell/SimpleTerminalConsole
+                                 no licence   Its companion, read for the same
+                                              reason. Nothing is copied from it.
+  jline/jline3                   NOASSERTION  The terminal library underneath, read
+                                 1796 stars   to establish when a system terminal is
+                                              attempted at all.
+  PaperMC/Paper                  mixed        The server nearly everything here runs.
+                                 12599 stars  GitHub reports NOASSERTION: the API and
+                                              the server are not under one licence.
+  PaperMC/Folia                  GPL-3.0      Regionised threading, and the second
+                                 4335 stars   platform this boots.
+  PurpurMC/Purpur                MIT          The third, and a second build API with
+                                 2397 stars   different habits, which is how the
+                                              digest handling stopped being specific
+                                              to one publisher.
+
+  SalyyS1/foliascan              Apache-2.0   Earlier tool by the same author: where
+                                              a plugin jar breaks on Folia.
+  SalyyS1/pluginscope             Apache-2.0  Earlier tool by the same author: what is
+                                              inside a plugin jar and what it targets.
+                                              Its console reporter and CLI shape are
+                                              followed here.
+  SalyyS1/serverdoctor            Apache-2.0  Earlier tool by the same author: reading
+                                              a server that has already run. mcstage is
+                                              the other direction — it produces the log
+                                              rather than reading one — and the
+                                              facts-versus-verdicts split comes from it.
+
+mcstage is an independent project. It is not affiliated with, endorsed by or
+sponsored by PaperMC, PurpurMC, Mojang or Microsoft.
+
+No Minecraft, Mojang, Paper, CraftBukkit, Bukkit, Folia or Purpur code is included
+in, derived into, or distributed with this project, and no game data is bundled. No
+server jar is redistributed: each one is downloaded from its own publisher at the
+time it is needed and verified against the digest that publisher published.
+
+The fake server used by the tests is original, written for this project, and
+deliberately misbehaves in ways a real server will not do on request.

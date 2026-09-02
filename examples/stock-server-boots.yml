@@ -1,0 +1,15 @@
+# A scenario that needs no plugin: any stock server boots, answers its console and shuts down cleanly.
+# This is the one used to verify mcstage itself. Run it with:
+#   mcstage test examples/stock-server-boots.yml --accept-eula
+name: a stock server boots and answers its console
+
+platforms: [paper, purpur]
+versions: ["1.21.4"]
+
+memory: 1G
+timeout: 20s
+
+steps:
+  - send: "list"
+  - expect: "players online"
+  - wait: 2s
