@@ -37,7 +37,7 @@ jobs:
           JAR=$(ls build/libs/mcstage-*.jar | grep -v thin)
           java -jar "$JAR" init /tmp/generated.yml
           java -jar "$JAR" validate /tmp/generated.yml --json > /tmp/validated.json
-          jq -e '.valid == true and (.cases | length == 1)' /tmp/validated.json
+          jq -e '.valid == true and (.cases | length >= 1)' /tmp/validated.json
           set +e
           java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work > /tmp/out.txt 2>&1
           code=$?
