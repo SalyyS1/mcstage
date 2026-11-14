@@ -174,6 +174,40 @@ class ScenarioFileTest {
         assertTrue(err.message!!.contains("Did you mean 'timeout'?"), err.message!!)
     }
 
+    @Test
+    fun `parses crash-guard, not-expect, file-not-exists, and rejects invalid regex`() {
+        val scenario = write(
+            """
+            platform: folia
+            version: "1.21.4"
+            crash-guard: true
+            steps:
+              - not-expect: "re:WARN|ERROR"
+                timeout: 750ms
+              - file-not-exists: "crash-reports/latest.txt"
+              - file-not-exists: "plugins/Warps/corrupt.db"
+                timeout: 400ms
+            """,
+        )
+        assertTrue(scenario.crashGuard)
+        assertEquals(3, scenario.steps.size)
+        val notExpect = scenario.steps[0] as Step.NotExpect
+        assertEquals(Duration.ofMillis(750), notExpect.duration)
+        assertTrue(notExpect.matcher.matches("[03:00:00 ERROR]: boom"))
+
+        val immediateAbsent = scenario.steps[1] as Step.FileNotExists
+        assertEquals("crash-reports/latest.txt", immediateAbsent.relativePath)
+        assertEquals(Duration.ZERO, immediateAbsent.duration)
+
+        val windowedAbsent = scenario.steps[2] as Step.FileNotExists
+        assertEquals(Duration.ofMillis(400), windowedAbsent.duration)
+
+        val badRegex = assertThrows<SetupError> {
+            write("steps:\n  - expect: \"re:[unclosed\"\n")
+        }
+        assertTrue(badRegex.message!!.contains("invalid regular expression"), badRegex.message!!)
+    }
+
     private fun write(text: String): Scenario {
         val file = dir.resolve("scenario.yml")
         Files.writeString(file, text.trimIndent())

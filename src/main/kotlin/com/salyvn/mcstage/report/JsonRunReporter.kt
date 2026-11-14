@@ -26,6 +26,7 @@ class JsonRunReporter {
         put("tool", report.tool)
         put("toolVersion", report.toolVersion)
         put("scenario", report.scenario)
+        report.scenarioFile?.let { put("scenarioFile", it) }
         put("startedAt", report.startedAt.toString())
         put("ok", report.ok)
         putJsonObject("summary") {
@@ -61,6 +62,22 @@ class JsonRunReporter {
                                     step.matched?.let { put("matched", it) }
                                 },
                             )
+                        }
+                    }
+                    if (case.diagnostics.isNotEmpty()) {
+                        putJsonArray("diagnostics") {
+                            for (finding in case.diagnostics) {
+                                add(
+                                    buildJsonObject {
+                                        put("ruleId", finding.ruleId)
+                                        put("severity", finding.severity)
+                                        put("message", finding.message)
+                                        finding.lineNumber?.let { put("lineNumber", it) }
+                                        finding.matchedLine?.let { put("matchedLine", it) }
+                                        finding.artifactPath?.let { put("artifactPath", it) }
+                                    },
+                                )
+                            }
                         }
                     }
                     if (case.tail.isNotEmpty()) {

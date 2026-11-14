@@ -37,7 +37,7 @@ class ScenarioRunner(
     private val launcher: ServerLauncher = ServerLauncher.REAL,
 ) {
 
-    fun run(scenario: Scenario): RunReport {
+    fun run(scenario: Scenario, scenarioFile: Path? = null): RunReport {
         val java = JavaRuntime.detect(javaOverride ?: scenario.java)
         listener.onEvent("java ${java.describe} at ${java.binary}")
 
@@ -62,6 +62,7 @@ class ScenarioRunner(
             scenario = scenario.name,
             startedAt = Instant.now(),
             cases = results,
+            scenarioFile = scenarioFile?.toString(),
         )
     }
 
@@ -79,26 +80,31 @@ class ScenarioRunner(
             facts["port"] = port.toString()
             prepared.notes.forEach(listener::onEvent)
         } catch (e: Exception) {
+            val msg = e.message ?: e::class.simpleName ?: "Scenario setup error"
             return CaseResult(
                 case = case,
                 outcome = Outcome.ERROR,
                 elapsed = elapsed(),
-                failure = e.message ?: e::class.simpleName,
+                failure = msg,
                 facts = facts,
+                diagnostics = listOf(DiagnosticFinding("MCS011", "error", msg)),
             )
         }
 
         if (!instance.eulaAccepted()) {
+            val msg = "The Minecraft EULA has not been accepted for ${instance.dir}. Pass --accept-eula " +
+                "to have mcstage write eula.txt, or write it yourself. mcstage never accepts it for you."
             return CaseResult(
                 case = case,
                 outcome = Outcome.ERROR,
                 elapsed = elapsed(),
-                failure = "The Minecraft EULA has not been accepted for ${instance.dir}. Pass --accept-eula " +
-                    "to have mcstage write eula.txt, or write it yourself. mcstage never accepts it for you.",
+                failure = msg,
                 facts = facts,
+                diagnostics = listOf(DiagnosticFinding("MCS011", "error", msg)),
             )
         }
 
+        val existingCrashReports = CrashAnalyzer.snapshotCrashReports(instance.dir)
         val server = ServerProcess(launcher.commandFor(instance, scenario, java), instance.dir)
         val watch = LineWatch(scenario.forbid)
         val steps = mutableListOf<StepResult>()
@@ -111,10 +117,21 @@ class ScenarioRunner(
         try {
             server.start()
         } catch (e: Exception) {
-            return CaseResult(case, Outcome.ERROR, elapsed(), steps, e.message, facts)
+            val msg = e.message ?: "Failed to start server process"
+            return CaseResult(
+                case = case,
+                outcome = Outcome.ERROR,
+                elapsed = elapsed(),
+                steps = steps,
+                failure = msg,
+                facts = facts,
+                diagnostics = listOf(DiagnosticFinding("MCS011", "error", msg)),
+            )
         }
 
         var failure: String? = null
+        var failureRuleId: String? = null
+        var failureLine: LogLine? = null
         val readyAt: Long
 
         val ready = server.await(scenario.ready, scenario.readyTimeout.toMillis(), ::consume)
@@ -123,11 +140,13 @@ class ScenarioRunner(
             is WaitResult.TimedOut -> {
                 failure = "The server did not report itself ready within " +
                     "${Durations.format(scenario.readyTimeout)} (waiting for ${scenario.ready.describe})."
+                failureRuleId = "MCS007"
                 -1
             }
 
             is WaitResult.Exited -> {
                 failure = "The server exited with code ${ready.exitCode} before it was ready."
+                failureRuleId = "MCS007"
                 -1
             }
         }
@@ -137,13 +156,49 @@ class ScenarioRunner(
             listener.onStep(steps.last())
         }
 
-        if (failure == null) failure = runSteps(scenario, instance.dir, server, steps, ::consume)
-        if (failure == null) failure = watch.firstViolation()
+        if (failure == null) {
+            failure = runSteps(scenario, instance.dir, server, steps, ::consume)
+            if (failure != null) failureRuleId = "MCS008"
+        }
+        if (failure == null) {
+            failure = watch.firstViolation()
+            if (failure != null) {
+                failureRuleId = "MCS009"
+                failureLine = watch.firstViolationLine()
+            }
+        }
 
         val stop = server.stop(scenario.stopCommand, scenario.stopTimeout.toMillis(), ::consume)
         if (failure == null && stop == StopOutcome.KILLED) {
             failure = "The server was still running ${Durations.format(scenario.stopTimeout)} after " +
                 "'${scenario.stopCommand}' and had to be killed."
+            failureRuleId = "MCS010"
+        }
+
+        val logDiagnostics = CrashAnalyzer.analyze(server.transcript, instance.dir, existingCrashReports)
+        if (failure == null && scenario.crashGuard) {
+            val crashGuardFailure = CrashAnalyzer.firstCrashGuardFailure(logDiagnostics)
+            if (crashGuardFailure != null) {
+                failure = crashGuardFailure
+            }
+        }
+
+        val diagnostics = buildList {
+            addAll(logDiagnostics)
+            if (failure != null && failureRuleId != null) {
+                add(
+                    DiagnosticFinding(
+                        ruleId = failureRuleId,
+                        severity = "error",
+                        message = failure,
+                        lineNumber = failureLine?.number,
+                        matchedLine = failureLine?.text?.trim(),
+                    ),
+                )
+            }
+        }
+        if (diagnostics.isNotEmpty()) {
+            facts["diagnostics"] = diagnostics.map { it.ruleId }.distinct().joinToString(", ")
         }
 
         watch.contribute(facts)
@@ -161,6 +216,7 @@ class ScenarioRunner(
             facts = facts,
             tail = if (failure == null) emptyList() else server.transcript.takeLast(TAIL_LINES).map { it.text },
             stop = stop,
+            diagnostics = diagnostics,
         )
     }
 
@@ -194,8 +250,10 @@ class ScenarioRunner(
                 }
 
                 is Step.Expect -> await(step.describe, server, step.matcher, step.timeout, consume, took = ::took)
+                is Step.NotExpect -> awaitNotExpect(step, server, consume, ::took)
                 is Step.Enabled -> await(step.describe, server, step.matcher, step.timeout, consume, took = ::took)
                 is Step.FileExists -> awaitFileExists(step, instanceDir, server, consume, ::took)
+                is Step.FileNotExists -> awaitFileNotExists(step, instanceDir, server, consume, ::took)
                 is Step.FileContains -> awaitFileContains(step, instanceDir, server, consume, ::took)
             }
 
@@ -223,6 +281,30 @@ class ScenarioRunner(
         is WaitResult.Exited -> StepResult(
             describe, false, took(),
             detail = "the server exited with code ${outcome.exitCode} first",
+        )
+    }
+
+    private fun awaitNotExpect(
+        step: Step.NotExpect,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult = when (val outcome = server.await(step.matcher, step.duration.toMillis(), consume)) {
+        is WaitResult.Matched -> StepResult(
+            step.describe,
+            ok = false,
+            elapsed = took(),
+            detail = "unexpected line ${outcome.line.number} ${step.matcher.describe}: ${outcome.line.text.trim()}",
+            matched = outcome.line.text,
+        )
+
+        is WaitResult.TimedOut -> StepResult(step.describe, ok = true, elapsed = took())
+
+        is WaitResult.Exited -> StepResult(
+            step.describe,
+            ok = false,
+            elapsed = took(),
+            detail = "the server exited with code ${outcome.exitCode} during ${Durations.format(step.duration)}",
         )
     }
 
@@ -260,6 +342,60 @@ class ScenarioRunner(
                         detail = "the server exited with code ${drained.exitCode} before ${step.relativePath} appeared",
                     )
                 }
+            }
+        }
+    }
+
+    private fun awaitFileNotExists(
+        step: Step.FileNotExists,
+        instanceDir: Path,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val target = InstancePaths.resolveInside(instanceDir, step.relativePath)
+        if (Files.exists(target)) {
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "${step.relativePath} exists inside the server instance",
+            )
+        }
+        if (step.duration.isZero) {
+            return StepResult(step.describe, ok = true, elapsed = took())
+        }
+        val deadlineNanos = System.nanoTime() + step.duration.toNanos()
+        while (true) {
+            val remainingMillis = (deadlineNanos - System.nanoTime()) / 1_000_000L
+            if (remainingMillis <= 0) {
+                return if (Files.exists(target)) {
+                    StepResult(
+                        step.describe,
+                        ok = false,
+                        elapsed = took(),
+                        detail = "${step.relativePath} appeared within ${Durations.format(step.duration)}",
+                    )
+                } else {
+                    StepResult(step.describe, ok = true, elapsed = took())
+                }
+            }
+            val drained = server.drain(minOf(FILE_POLL_MILLIS, remainingMillis), consume)
+            if (Files.exists(target)) {
+                return StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = "${step.relativePath} appeared within ${Durations.format(step.duration)}",
+                )
+            }
+            if (drained is WaitResult.Exited) {
+                return StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = "the server exited with code ${drained.exitCode} while watching ${step.relativePath}",
+                )
             }
         }
     }

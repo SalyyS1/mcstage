@@ -35,6 +35,8 @@ data class CaseResult(
     /** The end of the server's output, for a failure that needs context to read. */
     val tail: List<String> = emptyList(),
     val stop: StopOutcome? = null,
+    /** Structured crash/stage diagnostics (`MCS001` through `MCS011`) emitted during this case. */
+    val diagnostics: List<DiagnosticFinding> = emptyList(),
 ) {
     val ok: Boolean get() = outcome == Outcome.PASSED
 }
@@ -45,6 +47,7 @@ data class RunReport(
     val scenario: String,
     val startedAt: Instant,
     val cases: List<CaseResult>,
+    val scenarioFile: String? = null,
 ) {
     val passed: Int get() = cases.count { it.outcome == Outcome.PASSED }
     val failed: Int get() = cases.count { it.outcome == Outcome.FAILED }

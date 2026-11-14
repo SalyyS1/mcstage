@@ -31,19 +31,22 @@ jobs:
           java -jar "$JAR" test --help
           java -jar "$JAR" validate --help
 
-      - name: Scenario init and offline validate succeed
+      - name: Scenario init, offline validate, and SARIF v2.1.0 report succeed
         run: |
           set -euo pipefail
           JAR=$(ls build/libs/mcstage-*.jar | grep -v thin)
           java -jar "$JAR" init /tmp/generated.yml
           java -jar "$JAR" validate /tmp/generated.yml --json > /tmp/validated.json
-          jq -e '.valid == true and (.cases | length >= 1)' /tmp/validated.json
+          jq -e '.valid == true and (.cases | length >= 1) and (.crashGuard == false)' /tmp/validated.json
           set +e
-          java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work > /tmp/out.txt 2>&1
+          java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work --sarif /tmp/mcstage.sarif > /tmp/out.txt 2>&1
           code=$?
           set -e
           cat /tmp/out.txt
           test "$code" = "2" || { echo "expected exit code 2 for a run that could not start, got $code"; exit 1; }
+          jq -e '.version == "2.1.0" and .runs[0].tool.driver.name == "mcstage"' /tmp/mcstage.sarif
+          jq -e '[.runs[0].tool.driver.rules[].id] | index("MCS001") != null and index("MCS003") != null and index("MCS011") != null' /tmp/mcstage.sarif
+          jq -e '.runs[0].results[0].ruleId == "MCS011" and .runs[0].results[0].locations[0].physicalLocation.artifactLocation.uriBaseId == "%SRCROOT%"' /tmp/mcstage.sarif
 
       - name: A mistyped scenario key is refused with a suggestion
         run: |

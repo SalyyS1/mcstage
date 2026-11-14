@@ -57,7 +57,7 @@ class TestCommand : ScenarioCommand(name = "test") {
             basePort = basePort,
         )
 
-        emit(runner.run(scenario))
+        emit(runner.run(scenario, scenarioFile = file))
     }
 
     private fun remove(root: Path) {

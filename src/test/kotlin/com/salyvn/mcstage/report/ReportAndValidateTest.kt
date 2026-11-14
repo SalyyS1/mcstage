@@ -137,4 +137,49 @@ class ReportAndValidateTest {
         assertEquals(2, failed.statusCode)
         assertTrue(failed.stderr.contains("did not match any .jar"), failed.stderr)
     }
+
+    @Test
+    fun `sarif reporter emits OASIS SARIF v2_1_0 with MCS001-MCS011 rules and relative artifact URI`() {
+        val report = RunReport(
+            tool = "mcstage",
+            toolVersion = "0.3.0",
+            scenario = "folia-safety-matrix",
+            startedAt = Instant.parse("2026-11-15T03:00:00Z"),
+            scenarioFile = "/tmp/outside-workspace/mcstage.yml",
+            cases = listOf(
+                CaseResult(
+                    case = Scenario.Case(Platform.FOLIA, "1.21.4"),
+                    outcome = Outcome.FAILED,
+                    elapsed = Duration.ofMillis(1850),
+                    steps = listOf(StepResult("boot", ok = true, elapsed = Duration.ofMillis(920))),
+                    failure = "crash-guard triggered [MCS003] at log line 14: Thread failed main thread check",
+                    tail = listOf("[03:00:01 ERROR]: Thread failed main thread check"),
+                    stop = StopOutcome.CLEAN,
+                    diagnostics = listOf(
+                        com.salyvn.mcstage.run.DiagnosticFinding(
+                            ruleId = "MCS003",
+                            severity = "error",
+                            message = "Folia or Paper thread-safety violation: Thread failed main thread check",
+                            lineNumber = 14,
+                            matchedLine = "[03:00:01 ERROR]: Thread failed main thread check",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val sarifText = SarifRunReporter().render(report)
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(sarifText) as kotlinx.serialization.json.JsonObject
+        assertEquals("2.1.0", parsed["version"]?.toString()?.trim('"'))
+        assertTrue(sarifText.contains("\"MCS001\""))
+        assertTrue(sarifText.contains("\"MCS011\""))
+        assertTrue(sarifText.contains("\"ruleId\": \"MCS003\""))
+        assertTrue(sarifText.contains("\"uri\": \"mcstage.yml\""), sarifText)
+        assertTrue(sarifText.contains("\"uriBaseId\": \"%SRCROOT%\""))
+        assertTrue(sarifText.contains("\"folia/1.21.4\""))
+
+        val jsonText = JsonRunReporter().render(report)
+        assertTrue(jsonText.contains("\"diagnostics\""))
+        assertTrue(jsonText.contains("\"MCS003\""))
+    }
 }

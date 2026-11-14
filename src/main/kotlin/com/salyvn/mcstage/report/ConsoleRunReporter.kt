@@ -52,6 +52,13 @@ class ConsoleRunReporter(private val color: Boolean, private val verbose: Boolea
 
         for (step in case.steps) appendStep(step)
 
+        if (case.diagnostics.isNotEmpty()) {
+            for (finding in case.diagnostics) {
+                val tone = if (finding.severity == "error") Ansi.RED else Ansi.YELLOW
+                appendLine(paint("    [${finding.ruleId}] ${finding.message}", tone))
+            }
+        }
+
         case.failure?.let { appendLine(paint("    failure: $it", Ansi.RED)) }
 
         if (case.tail.isNotEmpty()) {

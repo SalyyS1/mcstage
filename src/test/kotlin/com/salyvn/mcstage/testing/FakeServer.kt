@@ -38,6 +38,29 @@ object FakeServer {
         log("INFO", "Done (${"%.3f".format(elapsedSeconds())}s)! For help, type \"help\"")
 
         if ("enable-plugin" in flags) log("INFO", "[TestPlugin] Enabling TestPlugin v1.0.0")
+        if ("folia-violation" in flags) {
+            log("ERROR", "Thread failed main thread check: Cannot read world asynchronously")
+            println("java.lang.IllegalStateException: TickThread.ensureTickThread")
+            println("\tat io.papermc.paper.util.TickThread.ensureTickThread(TickThread.java:57)")
+            System.out.flush()
+        }
+        if ("write-crash" in flags) {
+            val crashDir = java.nio.file.Path.of("crash-reports")
+            java.nio.file.Files.createDirectories(crashDir)
+            val crashFile = crashDir.resolve("crash-2026-11-15_03.30.00-server.txt")
+            java.nio.file.Files.writeString(
+                crashFile,
+                """
+                ---- Minecraft Crash Report ----
+                Time: 2026-11-15 03:30:00
+                Description: Exception ticking world
+
+                java.lang.NullPointerException: chunk holder missing
+                    at com.example.TestPlugin.tick(TestPlugin.java:44)
+                """.trimIndent() + "\n",
+            )
+            log("ERROR", "This crash report has been saved to: ${crashFile.toAbsolutePath()}")
+        }
         if ("throw" in flags) {
             log("ERROR", "Could not pass event PlayerJoinEvent to TestPlugin v1.0.0")
             println("java.lang.IllegalStateException: broken on purpose")

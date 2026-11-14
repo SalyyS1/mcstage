@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mcstage v0.3.0 | Real-Server Plugin CI Matrix Builder & Crash Log Simulator</title>
+  <meta name="description" content="Zero-upload browser builder and validator for mcstage YAML scenarios, GitHub Actions workflows, and MCS001-MCS011 Paper/Folia/Purpur crash log SARIF v2.1.0 diagnostics." />
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #121826;
+      --panel-alt: #172033;
+      --border: #26324d;
+      --text: #e6edf7;
+      --muted: #93a4c3;
+      --accent: #38bdf8;
+      --accent-strong: #0ea5e9;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #101728 0%, #0b0f17 100%);
+      padding: 28px 24px 22px;
+    }
+    .wrap {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    .topline {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    h1 {
+      margin: 10px 0 6px;
+      font-size: 26px;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14.5px;
+      max-width: 880px;
+    }
+    .navlinks {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .navlinks a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .navlinks a:hover { border-color: var(--accent); }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 20px auto 0;
+      max-width: 1240px;
+      padding: 0 24px;
+    }
+    .tab-btn {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 9px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 600;
+    }
+    .tab-btn.active {
+      color: var(--bg);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    main {
+      max-width: 1240px;
+      margin: 16px auto 48px;
+      padding: 0 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    label {
+      display: block;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: #0b101b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+    textarea {
+      min-height: 220px;
+      resize: vertical;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .checks {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .checks label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      font-weight: 500;
+      margin: 0;
+      cursor: pointer;
+    }
+    .btn {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12.5px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary {
+      background: var(--accent-strong);
+      color: #fff;
+      border-color: var(--accent-strong);
+    }
+    .step-item {
+      display: grid;
+      grid-template-columns: 135px 1fr 90px auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      background: var(--panel-alt);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .step-extra {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 135px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    pre {
+      margin: 0;
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 12px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: #d9e5ff;
+      max-height: 440px;
+    }
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .pill {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: #0d1424;
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
+    .status-box {
+      padding: 10px 12px;
+      border-radius: 7px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      font-family: var(--mono);
+    }
+    .status-ok {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #86efac;
+    }
+    .status-err {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+    }
+    .finding {
+      border: 1px solid var(--border);
+      background: #0d1422;
+      border-radius: 7px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .finding-head {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .sev-error { color: var(--err); font-weight: 700; }
+    .sev-warning { color: var(--warn); font-weight: 700; }
+    .hidden { display: none; }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 18px 24px;
+      color: var(--muted);
+      font-size: 12.5px;
+      text-align: center;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="topline">
+        <span class="badge">mcstage v0.3.0 | Zero-Upload Browser Tool</span>
+        <div class="navlinks">
+          <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
+          <a href="https://github.com/SalyyS1/mcstage/releases">Releases (CLI JAR)</a>
+        </div>
+      </div>
+      <h1>MCStage Real-Server Plugin Matrix Builder &amp; Crash Log Simulator</h1>
+      <p class="subtitle">
+        Design multi-platform Paper, Folia, and Purpur integration scenarios, validate instance path confinement and regex matchers offline, generate GitHub Actions + SARIF v2.1.0 workflows, and test MCS001-MCS011 crash diagnostics entirely in your browser.
+      </p>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBuilderBtn" onclick="switchTab('builder')">1. Scenario Matrix &amp; CI Workflow Builder</button>
+    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Server Log Crash Classifier &amp; SARIF v2.1.0 Lab</button>
+  </div>
+
+  <main>
+    <section id="builderSection" class="grid">
+      <div class="card">
+        <h2>
+          <span>Scenario Configuration</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" onclick="loadPreset('warps')">Warps Reload Preset</button>
+            <button class="btn" onclick="loadPreset('folia')">Folia Strict Guard</button>
+          </div>
+        </h2>
+
+        <div class="row">
+          <div>
+            <label for="scName">Scenario Name</label>
+            <input type="text" id="scName" value="warps survive a reload" oninput="renderScenario()" />
+          </div>
+          <div>
+            <label for="scVersions">Versions (comma-separated)</label>
+            <input type="text" id="scVersions" value="latest, 1.21.4" oninput="renderScenario()" />
+          </div>
+        </div>
+
+        <label>Target Server Platforms</label>
+        <div class="checks">
+          <label><input type="checkbox" id="pfPaper" checked onchange="renderScenario()" /> paper</label>
+          <label><input type="checkbox" id="pfFolia" checked onchange="renderScenario()" /> folia</label>
+          <label><input type="checkbox" id="pfPurpur" checked onchange="renderScenario()" /> purpur</label>
+          <label><input type="checkbox" id="scCrashGuard" checked onchange="renderScenario()" /> crash-guard: true (MCS001-MCS006)</label>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="scMemory">JVM Heap (memory)</label>
+            <input type="text" id="scMemory" value="2G" oninput="renderScenario()" />
+          </div>
+          <div>
+            <label for="scTimeout">Default Step Timeout</label>
+            <input type="text" id="scTimeout" value="20s" oninput="renderScenario()" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="scPlugins">Plugin JAR Globs (comma-separated)</label>
+            <input type="text" id="scPlugins" value="build/libs/*.jar" oninput="renderScenario()" />
+          </div>
+          <div>
+            <label for="scForbid">Forbid Patterns (comma-separated)</label>
+            <input type="text" id="scForbid" value="Could not load 'plugins, re:Exception in thread &quot;Server thread&quot;" oninput="renderScenario()" />
+          </div>
+        </div>
+
+        <h2>
+          <span>Stage Assertion Steps</span>
+          <button class="btn btn-primary" onclick="addStep()">+ Add Step</button>
+        </h2>
+        <div id="stepsContainer"></div>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>Live Validation &amp; Generated Artifacts</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" onclick="copyText('yamlOut')">Copy mcstage.yml</button>
+            <button class="btn" onclick="downloadFile('mcstage.yml', document.getElementById('yamlOut').textContent)">Download YAML</button>
+          </div>
+        </h2>
+
+        <div id="validationStatus" class="status-box status-ok"></div>
+        <div style="margin-bottom: 12px;">
+          <label>Expanded Server Matrix Cases</label>
+          <div id="matrixPills" class="pill-list"></div>
+        </div>
+
+        <label>Generated mcstage.yml</label>
+        <pre id="yamlOut" style="margin-bottom:14px;"></pre>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label style="margin:0;">GitHub Actions Workflow (.github/workflows/mcstage.yml)</label>
+          <button class="btn" onclick="copyText('ghaOut')">Copy Workflow</button>
+        </div>
+        <pre id="ghaOut"></pre>
+      </div>
+    </section>
+
+    <section id="simSection" class="grid hidden">
+      <div class="card">
+        <h2>
+          <span>Console Transcript Input (latest.log)</span>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn" onclick="loadLogSample('folia')">Sample: Folia MCS003</button>
+            <button class="btn" onclick="loadLogSample('linkage')">Sample: Linkage MCS002</button>
+            <button class="btn" onclick="loadLogSample('watchdog')">Sample: Watchdog MCS005</button>
+            <button class="btn" onclick="loadLogSample('clean')">Sample: Clean Pass</button>
+          </div>
+        </h2>
+        <div class="row">
+          <div>
+            <label for="simCasePlatform">Simulated Platform</label>
+            <select id="simCasePlatform" onchange="runLogAudit()">
+              <option value="folia">folia</option>
+              <option value="paper">paper</option>
+              <option value="purpur">purpur</option>
+            </select>
+          </div>
+          <div>
+            <label for="simCaseVersion">Simulated Version</label>
+            <input type="text" id="simCaseVersion" value="1.21.4" oninput="runLogAudit()" />
+          </div>
+        </div>
+        <label for="logInput">Paste server console lines or drop a latest.log file</label>
+        <textarea id="logInput" oninput="runLogAudit()"></textarea>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>Crash Diagnostics (MCS001-MCS011) &amp; SARIF v2.1.0</span>
+          <button class="btn btn-primary" onclick="downloadSarif()">Download mcstage.sarif</button>
+        </h2>
+        <div id="simSummary" class="status-box status-ok"></div>
+        <div id="findingsList" style="margin-bottom:14px;"></div>
+        <label>OASIS SARIF v2.1.0 Preview</label>
+        <pre id="sarifOut"></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.3.0. Runs 100% locally in your browser with zero network uploads.
+  </footer>
+
+  <script>
+    const RULES = [
+      {
+        id: "MCS001",
+        name: "PluginLoadFailure",
+        severity: "error",
+        shortDescription: "Plugin JAR failed to load or resolve dependencies",
+        help: "Verify plugin.yml or paper-plugin.yml syntax, declared api-version, and required dependencies.",
+        regex: /Could not load 'plugins\/[^']+'|org\.bukkit\.plugin\.(InvalidPluginException|InvalidDescriptionException|UnknownDependencyException|CircularPluginDependencyException)/
+      },
+      {
+        id: "MCS002",
+        name: "PluginEnableOrLinkageError",
+        severity: "error",
+        shortDescription: "Plugin failed during onEnable or threw a JVM linkage error",
+        help: "Check Java bytecode target compatibility, shaded relocations, and Mojang/Paper API signatures.",
+        regex: /Error occurred while enabling [^\n]+|java\.lang\.(UnsupportedClassVersionError|NoClassDefFoundError|NoSuchMethodError|NoSuchFieldError|LinkageError|ClassNotFoundException)\b/
+      },
+      {
+        id: "MCS003",
+        name: "FoliaRegionThreadViolation",
+        severity: "error",
+        shortDescription: "Folia or Paper off-thread world or entity access violation",
+        help: "Dispatch region-local mutations via RegionScheduler or EntityScheduler instead of global or async executors.",
+        regex: /Thread failed main thread check|Cannot (read|modify) world asynchronously|TickThread\.ensureTickThread|AsyncCatcher|off-main-thread/i
+      },
+      {
+        id: "MCS005",
+        name: "WatchdogStallOrOutOfMemory",
+        severity: "error",
+        shortDescription: "Server watchdog tick stall or JVM OutOfMemoryError",
+        help: "Avoid blocking I/O on tick threads or increase scenario memory.",
+        regex: /DO NOT REPORT THIS TO PAPER - THIS IS NOT A BUG OR A CRASH|The server has stopped responding!|WatchdogThread|java\.lang\.OutOfMemoryError\b/
+      },
+      {
+        id: "MCS006",
+        name: "ServerCrashReportSaved",
+        severity: "error",
+        shortDescription: "Minecraft crash report generated in crash-reports/",
+        help: "Inspect the preserved crash report inside the .mcstage instance directory.",
+        regex: /This crash report has been saved to:\s*(.+)/
+      },
+      {
+        id: "MCS004",
+        name: "UnhandledEventOrCommandException",
+        severity: "warning",
+        shortDescription: "Unhandled exception during event dispatch or console command execution",
+        help: "Inspect the stack trace in the case log tail and guard nullable or version-specific server state.",
+        regex: /Could not pass event \S+ to [^\n]+|Unhandled exception executing command [^\n]+|Exception in thread "[^"]+"/
+      }
+    ];
+
+    let steps = [
+      { action: "enabled", value: "Warps", timeout: "60s", match: "" },
+      { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "" },
+      { action: "send", value: "warp set spawn", timeout: "", match: "" },
+      { action: "expect", value: "set warp spawn", timeout: "", match: "" },
+      { action: "file-contains", value: "plugins/Warps/warps.yml", timeout: "5s", match: "spawn" },
+      { action: "send", value: "warp reload", timeout: "", match: "" },
+      { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "" },
+      { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "" }
+    ];
+
+    function switchTab(which) {
+      const builder = which === "builder";
+      document.getElementById("builderSection").classList.toggle("hidden", !builder);
+      document.getElementById("simSection").classList.toggle("hidden", builder);
+      document.getElementById("tabBuilderBtn").classList.toggle("active", builder);
+      document.getElementById("tabSimBtn").classList.toggle("active", !builder);
+    }
+
+    function loadPreset(kind) {
+      if (kind === "folia") {
+        document.getElementById("scName").value = "folia region thread safety gate";
+        document.getElementById("pfPaper").checked = true;
+        document.getElementById("pfFolia").checked = true;
+        document.getElementById("pfPurpur").checked = false;
+        document.getElementById("scVersions").value = "latest, 26.3, 1.21.4";
+        document.getElementById("scCrashGuard").checked = true;
+        steps = [
+          { action: "enabled", value: "RegionPlugin", timeout: "60s", match: "" },
+          { action: "send", value: "region benchmark 50", timeout: "", match: "" },
+          { action: "expect", value: "benchmark completed", timeout: "15s", match: "" },
+          { action: "not-expect", value: "re:Thread failed main thread check|TickThread", timeout: "3s", match: "" },
+          { action: "file-not-exists", value: "crash-reports/latest.txt", timeout: "", match: "" }
+        ];
+      } else {
+        document.getElementById("scName").value = "warps survive a reload";
+        document.getElementById("pfPaper").checked = true;
+        document.getElementById("pfFolia").checked = true;
+        document.getElementById("pfPurpur").checked = true;
+        document.getElementById("scVersions").value = "latest, 1.21.4";
+        document.getElementById("scCrashGuard").checked = true;
+        steps = [
+          { action: "enabled", value: "Warps", timeout: "60s", match: "" },
+          { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "" },
+          { action: "send", value: "warp reload", timeout: "", match: "" },
+          { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "" },
+          { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "" }
+        ];
+      }
+      renderStepsEditor();
+      renderScenario();
+    }
+
+    function addStep() {
+      steps.push({ action: "expect", value: "Done", timeout: "", match: "" });
+      renderStepsEditor();
+      renderScenario();
+    }
+
+    function removeStep(idx) {
+      steps.splice(idx, 1);
+      renderStepsEditor();
+      renderScenario();
+    }
+
+    function updateStep(idx, field, val) {
+      steps[idx][field] = val;
+      if (field === "action") renderStepsEditor();
+      renderScenario();
+    }
+
+    function renderStepsEditor() {
+      const box = document.getElementById("stepsContainer");
+      box.innerHTML = "";
+      steps.forEach((st, idx) => {
+        const div = document.createElement("div");
+        div.className = "step-item";
+        const actions = ["enabled", "send", "expect", "not-expect", "file-exists", "file-not-exists", "file-contains", "wait"];
+        const options = actions.map(a => `<option value="${a}" ${st.action === a ? "selected" : ""}>${a}</option>`).join("");
+        const showTimeout = st.action !== "send" && st.action !== "wait";
+        div.innerHTML = `
+          <select onchange="updateStep(${idx}, 'action', this.value)">${options}</select>
+          <input type="text" value="${escapeHtmlAttr(st.value)}" placeholder="${placeholderFor(st.action)}" oninput="updateStep(${idx}, 'value', this.value)" />
+          ${showTimeout
+            ? `<input type="text" value="${escapeHtmlAttr(st.timeout)}" placeholder="timeout" oninput="updateStep(${idx}, 'timeout', this.value)" />`
+            : `<span style="font-size:11.5px;color:var(--muted);text-align:center;">-</span>`}
+          <button class="btn" onclick="removeStep(${idx})">Remove</button>
+          ${st.action === "file-contains" ? `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">match pattern:</span>
+              <input type="text" value="${escapeHtmlAttr(st.match)}" placeholder="substring or re:pattern" oninput="updateStep(${idx}, 'match', this.value)" />
+            </div>
+          ` : ""}
+        `;
+        box.appendChild(div);
+      });
+    }
+
+    function placeholderFor(action) {
+      if (action === "enabled") return "PluginName";
+      if (action === "send") return "console command";
+      if (action === "wait") return "5s";
+      if (action.startsWith("file-")) return "plugins/MyPlugin/config.yml";
+      return "substring or re:pattern";
+    }
+
+    function validateDuration(raw, label, errors) {
+      if (!raw) return;
+      if (!/^\d+(\.\d+)?(ms|s|m|h)?$/.test(raw.trim())) {
+        errors.push(`${label}: '${raw}' is not a valid duration (use e.g. 500ms, 5s, 2m).`);
+      }
+    }
+
+    function validateRelativePath(raw, label, errors) {
+      const norm = (raw || "").trim().replace(/\\/g, "/");
+      if (!norm) {
+        errors.push(`${label}: file path cannot be empty.`);
+        return;
+      }
+      if (norm.startsWith("/") || /^[A-Za-z]:/.test(norm)) {
+        errors.push(`${label}: '${raw}' must be relative to the server instance directory.`);
+        return;
+      }
+      const segs = norm.split("/");
+      if (segs.some(s => !s || s === "." || s === "..")) {
+        errors.push(`${label}: '${raw}' escapes or traverses outside the server instance directory.`);
+      }
+    }
+
+    function validateMatcher(raw, label, errors) {
+      if (!raw) {
+        errors.push(`${label}: pattern cannot be empty.`);
+        return;
+      }
+      if (raw.startsWith("re:")) {
+        try {
+          new RegExp(raw.slice(3));
+        } catch (e) {
+          errors.push(`${label}: invalid regular expression '${raw}': ${e.message}`);
+        }
+      }
+    }
+
+    function yamlQuote(str) {
+      if (/^[A-Za-z0-9._/-]+$/.test(str) && !/^(true|false|null|\d+(\.\d+)?)$/i.test(str)) {
+        return str;
+      }
+      return JSON.stringify(str);
+    }
+
+    function renderScenario() {
+      const errors = [];
+      const name = document.getElementById("scName").value.trim() || "plugin-integration";
+      const platforms = [];
+      if (document.getElementById("pfPaper").checked) platforms.push("paper");
+      if (document.getElementById("pfFolia").checked) platforms.push("folia");
+      if (document.getElementById("pfPurpur").checked) platforms.push("purpur");
+      if (platforms.length === 0) errors.push("Select at least one platform (paper, folia, or purpur).");
+
+      const versions = document.getElementById("scVersions").value.split(",").map(s => s.trim()).filter(Boolean);
+      if (versions.length === 0) errors.push("Specify at least one Minecraft version (e.g. latest, 1.21.4).");
+
+      const memory = document.getElementById("scMemory").value.trim() || "2G";
+      const timeout = document.getElementById("scTimeout").value.trim() || "20s";
+      validateDuration(timeout, "timeout", errors);
+
+      const crashGuard = document.getElementById("scCrashGuard").checked;
+      const plugins = document.getElementById("scPlugins").value.split(",").map(s => s.trim()).filter(Boolean);
+      const forbid = document.getElementById("scForbid").value.split(",").map(s => s.trim()).filter(Boolean);
+      forbid.forEach((f, i) => validateMatcher(f, `forbid[${i}]`, errors));
+
+      if (steps.length === 0) errors.push("Scenario has no steps; add at least one assertion step.");
+
+      steps.forEach((st, i) => {
+        const at = `steps[${i}] (${st.action})`;
+        if (st.timeout) validateDuration(st.timeout, `${at}.timeout`, errors);
+        if (st.action === "wait") validateDuration(st.value, at, errors);
+        else if (st.action === "expect" || st.action === "not-expect") validateMatcher(st.value, at, errors);
+        else if (st.action === "file-exists" || st.action === "file-not-exists") validateRelativePath(st.value, at, errors);
+        else if (st.action === "file-contains") {
+          validateRelativePath(st.value, `${at}.path`, errors);
+          validateMatcher(st.match, `${at}.match`, errors);
+        } else if (!st.value.trim()) {
+          errors.push(`${at}: value cannot be empty.`);
+        }
+      });
+
+      const pills = document.getElementById("matrixPills");
+      pills.innerHTML = "";
+      platforms.forEach(p => versions.forEach(v => {
+        const span = document.createElement("span");
+        span.className = "pill";
+        span.textContent = `${p} ${v}`;
+        pills.appendChild(span);
+      }));
+
+      const status = document.getElementById("validationStatus");
+      if (errors.length === 0) {
+        status.className = "status-box status-ok";
+        status.textContent = `VALID: ${platforms.length * versions.length} server case(s), ${steps.length} step(s), crash-guard=${crashGuard}`;
+      } else {
+        status.className = "status-box status-err";
+        status.textContent = `INVALID (${errors.length}): ${errors[0]}`;
+      }
+
+      const lines = [];
+      lines.push(`name: ${yamlQuote(name)}`);
+      lines.push(`platforms: [${platforms.join(", ")}]`);
+      lines.push(`versions: [${versions.map(v => JSON.stringify(v)).join(", ")}]`);
+      lines.push(`memory: ${yamlQuote(memory)}`);
+      if (crashGuard) lines.push(`crash-guard: true`);
+      if (plugins.length > 0) {
+        lines.push("");
+        lines.push("plugins:");
+        plugins.forEach(p => lines.push(`  - ${yamlQuote(p)}`));
+      }
+      if (forbid.length > 0) {
+        lines.push("");
+        lines.push("forbid:");
+        forbid.forEach(f => lines.push(`  - ${yamlQuote(f)}`));
+      }
+      lines.push("");
+      lines.push(`timeout: ${timeout}`);
+      lines.push("");
+      lines.push("steps:");
+      steps.forEach(st => {
+        lines.push(`  - ${st.action}: ${yamlQuote(st.value)}`);
+        if (st.action === "file-contains") {
+          lines.push(`    match: ${yamlQuote(st.match)}`);
+        }
+        if (st.timeout && st.action !== "send" && st.action !== "wait") {
+          lines.push(`    timeout: ${st.timeout}`);
+        }
+      });
+
+      document.getElementById("yamlOut").textContent = lines.join("\n");
+
+      const gha = [
+        "name: mcstage",
+        "on: [push, pull_request]",
+        "",
+        "permissions:",
+        "  contents: read",
+        "  security-events: write",
+        "",
+        "jobs:",
+        "  integration:",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+        "      - uses: actions/checkout@v4",
+        "      - uses: actions/setup-java@v4",
+        "        with:",
+        "          distribution: temurin",
+        "          java-version: '21'",
+        "      - run: ./gradlew build --no-daemon",
+        "",
+        "      - name: Run Real-Server Matrix",
+        "        uses: SalyyS1/mcstage@v0.3.0",
+        "        with:",
+        "          scenario: mcstage.yml",
+        "          accept-eula: 'true'",
+        "          format: junit",
+        "          output: build/test-results/mcstage.xml",
+        "          sarif: build/reports/mcstage.sarif",
+        "",
+        "      - name: Upload SARIF Diagnostics",
+        "        if: always()",
+        "        uses: github/codeql-action/upload-sarif@v3",
+        "        with:",
+        "          sarif_file: build/reports/mcstage.sarif"
+      ].join("\n");
+      document.getElementById("ghaOut").textContent = gha;
+    }
+
+    function loadLogSample(kind) {
+      const samples = {
+        folia: [
+          "[03:14:01 INFO]: Starting minecraft server version 1.21.4",
+          "[03:14:03 INFO]: [Warps] Loading server plugin Warps v1.4.0",
+          "[03:14:05 INFO]: Done (3.812s)! For help, type \"help\"",
+          "[03:14:05 INFO]: [Warps] Enabling Warps v1.4.0",
+          "[03:14:06 INFO]: issued server command: /warp teleport spawn",
+          "[03:14:06 ERROR]: Thread failed main thread check: Cannot read world asynchronously",
+          "java.lang.IllegalStateException: TickThread.ensureTickThread",
+          "    at io.papermc.paper.util.TickThread.ensureTickThread(TickThread.java:57)",
+          "[03:14:06 ERROR]: Could not pass event PlayerTeleportEvent to Warps v1.4.0",
+          "[03:14:07 INFO]: Stopping server"
+        ].join("\n"),
+        linkage: [
+          "[03:15:00 INFO]: Starting minecraft server version 26.3",
+          "[03:15:02 ERROR]: Could not load 'plugins/LegacyNMS-2.1.jar' in folder 'plugins'",
+          "org.bukkit.plugin.InvalidPluginException: java.lang.UnsupportedClassVersionError: com/example/LegacyPlugin",
+          "[03:15:04 INFO]: Done (2.940s)! For help, type \"help\"",
+          "[03:15:04 ERROR]: Error occurred while enabling CompanionPlugin v1.0 (Is it up to date?)",
+          "java.lang.NoSuchMethodError: 'org.bukkit.inventory.Inventory org.bukkit.event.inventory.InventoryEvent.getInventory()'"
+        ].join("\n"),
+        watchdog: [
+          "[03:18:00 INFO]: Starting minecraft server version 1.21.4",
+          "[03:18:04 INFO]: Done (4.110s)! For help, type \"help\"",
+          "[03:18:45 ERROR]: --- DO NOT REPORT THIS TO PAPER - THIS IS NOT A BUG OR A CRASH ---",
+          "[03:18:45 ERROR]: The server has stopped responding! This is (probably) not a Paper bug.",
+          "[03:18:46 ERROR]: This crash report has been saved to: /srv/.mcstage/paper-1.21.4/crash-reports/crash-2026-11-15_03.18.46-server.txt"
+        ].join("\n"),
+        clean: [
+          "[03:20:00 INFO]: Starting minecraft server version 1.21.4",
+          "[03:20:03 INFO]: Done (3.015s)! For help, type \"help\"",
+          "[03:20:03 INFO]: [Warps] Enabling Warps v1.4.0",
+          "[03:20:04 INFO]: issued server command: /warp reload",
+          "[03:20:04 INFO]: [Warps] reloaded 4 warps",
+          "[03:20:05 INFO]: Stopping server"
+        ].join("\n")
+      };
+      document.getElementById("logInput").value = samples[kind] || samples.folia;
+      runLogAudit();
+    }
+
+    function runLogAudit() {
+      const text = document.getElementById("logInput").value || "";
+      const platform = document.getElementById("simCasePlatform").value;
+      const version = document.getElementById("simCaseVersion").value.trim() || "1.21.4";
+      const caseLabel = `${platform} ${version}`;
+      const lines = text.split(/\r?\n/);
+      const findings = [];
+      const counts = {};
+
+      lines.forEach((line, idx) => {
+        for (const r of RULES) {
+          if ((counts[r.id] || 0) >= 5) continue;
+          if (r.regex.test(line)) {
+            findings.push({
+              ruleId: r.id,
+              name: r.name,
+              severity: r.severity,
+              lineNumber: idx + 1,
+              matchedLine: line.trim(),
+              message: `${r.shortDescription}: ${line.trim()}`,
+              help: r.help
+            });
+            counts[r.id] = (counts[r.id] || 0) + 1;
+            break;
+          }
+        }
+      });
+
+      const summary = document.getElementById("simSummary");
+      if (findings.length === 0) {
+        summary.className = "status-box status-ok";
+        summary.textContent = `PASS (${caseLabel}): 0 crash or thread-safety signatures across ${lines.length} log line(s)`;
+      } else {
+        summary.className = "status-box status-err";
+        summary.textContent = `CRASH-GUARD TRIGGERED (${caseLabel}): ${findings.length} diagnostic finding(s) [${[...new Set(findings.map(f => f.ruleId))].join(", ")}]`;
+      }
+
+      const list = document.getElementById("findingsList");
+      list.innerHTML = findings.map(f => `
+        <div class="finding">
+          <div class="finding-head">
+            <span class="${f.severity === 'error' ? 'sev-error' : 'sev-warning'}">[${f.ruleId}] ${escapeHtml(f.name)} (${f.severity})</span>
+            <span style="color:var(--muted);">line ${f.lineNumber}</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:12px;margin-bottom:4px;">${escapeHtml(f.matchedLine)}</div>
+          <div style="font-size:12px;color:var(--muted);">${escapeHtml(f.help)}</div>
+        </div>
+      `).join("");
+
+      const sarif = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+          {
+            "tool": {
+              "driver": {
+                "name": "mcstage",
+                "version": "0.3.0",
+                "informationUri": "https://github.com/SalyyS1/mcstage",
+                "rules": RULES.map(r => ({
+                  "id": r.id,
+                  "name": r.name,
+                  "shortDescription": { "text": r.shortDescription },
+                  "help": { "text": r.help },
+                  "defaultConfiguration": { "level": r.severity }
+                }))
+              }
+            },
+            "results": findings.map(f => ({
+              "ruleId": f.ruleId,
+              "level": f.severity,
+              "message": { "text": `[${caseLabel}] ${f.message}` },
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": { "uri": "mcstage.yml", "uriBaseId": "%SRCROOT%" },
+                    "region": { "startLine": 1 }
+                  },
+                  "logicalLocations": [
+                    {
+                      "name": caseLabel,
+                      "fullyQualifiedName": `${platform}/${version}`,
+                      "kind": "server-matrix-case"
+                    }
+                  ]
+                }
+              ],
+              "properties": {
+                "platform": platform,
+                "version": version,
+                "logLine": f.lineNumber,
+                "matchedLine": f.matchedLine
+              }
+            }))
+          }
+        ]
+      };
+      document.getElementById("sarifOut").textContent = JSON.stringify(sarif, null, 2);
+    }
+
+    function copyText(id) {
+      const txt = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(txt);
+    }
+
+    function downloadFile(filename, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function downloadSarif() {
+      downloadFile("mcstage.sarif", document.getElementById("sarifOut").textContent);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function escapeHtmlAttr(s) {
+      return escapeHtml(s).replace(/"/g, "&quot;");
+    }
+
+    renderStepsEditor();
+    renderScenario();
+    loadLogSample("folia");
+  </script>
+</body>
+</html>

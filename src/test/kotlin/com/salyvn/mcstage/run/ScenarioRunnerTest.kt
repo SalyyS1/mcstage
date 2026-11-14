@@ -14,7 +14,7 @@ import java.time.Duration
 
 /**
  * The runner's own decisions, checked against a process that misbehaves on request: a step that is never
- * satisfied, a line the scenario forbade, a shutdown that has to be forced.
+ * satisfied, a line the scenario forbade, a shutdown that has to be forced, and Folia/crash-guard violations.
  */
 class ScenarioRunnerTest {
 
@@ -50,9 +50,11 @@ class ScenarioRunnerTest {
         )
 
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.FAILED, case.outcome)
-        assertTrue(case.failure!!.contains("a line no server prints"), case.failure!!)
+        assertTrue(msg.contains("a line no server prints"), msg)
         assertTrue(case.tail.isNotEmpty(), "a failure should carry the end of the output")
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS008" })
     }
 
     @Test
@@ -65,9 +67,12 @@ class ScenarioRunnerTest {
         )
 
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.FAILED, case.outcome)
-        assertTrue(case.failure!!.contains("forbids"), case.failure!!)
+        assertTrue(msg.contains("forbids"), msg)
         assertTrue(case.steps.all { it.ok }, "every step was fine; the run failed on the output")
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS009" })
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS004" })
     }
 
     @Test
@@ -78,9 +83,11 @@ class ScenarioRunnerTest {
         )
 
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.FAILED, case.outcome)
         assertEquals(StopOutcome.KILLED, case.stop)
-        assertTrue(case.failure!!.contains("killed"), case.failure!!)
+        assertTrue(msg.contains("killed"), msg)
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS010" })
     }
 
     @Test
@@ -93,9 +100,11 @@ class ScenarioRunnerTest {
         ).run(scenario(Step.Wait(Duration.ofMillis(100))))
 
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.ERROR, case.outcome)
-        assertTrue(case.failure!!.contains("EULA"), case.failure!!)
+        assertTrue(msg.contains("EULA"), msg)
         assertTrue(case.steps.isEmpty(), "nothing should have run")
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS011" })
     }
 
     @Test
@@ -103,8 +112,10 @@ class ScenarioRunnerTest {
         val report = run(scenario(Step.Wait(Duration.ofSeconds(1))), "die-before-ready")
 
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.FAILED, case.outcome)
-        assertTrue(case.failure!!.contains("exited with code 1"), case.failure!!)
+        assertTrue(msg.contains("exited with code 1"), msg)
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS007" })
     }
 
     @Test
@@ -132,8 +143,49 @@ class ScenarioRunnerTest {
             scenario(Step.FileExists("plugins/TestPlugin/missing.yml", Duration.ofMillis(350))),
         )
         val case = report.cases.single()
+        val msg = case.failure!!
         assertEquals(Outcome.FAILED, case.outcome)
-        assertTrue(case.failure!!.contains("missing.yml"), case.failure!!)
+        assertTrue(msg.contains("missing.yml"), msg)
+    }
+
+    @Test
+    fun `not-expect and file-not-exists pass when quiet and fail when violated`() {
+        val quiet = run(
+            scenario(
+                Step.NotExpect(LineMatcher.parse("Something worth mentioning"), Duration.ofMillis(250)),
+                Step.FileNotExists("plugins/TestPlugin/absent.yml", Duration.ofMillis(150)),
+            ),
+        )
+        assertEquals(Outcome.PASSED, quiet.cases.single().outcome)
+
+        val noisy = run(
+            scenario(
+                Step.Send("say forbidden-echo"),
+                Step.NotExpect(LineMatcher.parse("forbidden-echo"), Duration.ofSeconds(2)),
+            ),
+        )
+        val noisyCase = noisy.cases.single()
+        assertEquals(Outcome.FAILED, noisyCase.outcome)
+        assertTrue(noisyCase.failure!!.contains("forbidden-echo"))
+    }
+
+    @Test
+    fun `crash-guard catches Folia region violations and crash-reports files automatically`() {
+        val report = run(
+            scenario(Step.Wait(Duration.ofMillis(250))).copy(crashGuard = true),
+            "folia-violation",
+            "write-crash",
+        )
+        val case = report.cases.single()
+        val msg = case.failure!!
+        assertEquals(Outcome.FAILED, case.outcome)
+        assertTrue(msg.contains("crash-guard triggered [MCS003]"), msg)
+        val ruleIds = case.diagnostics.map { it.ruleId }.toSet()
+        assertTrue("MCS003" in ruleIds, ruleIds.toString())
+        assertTrue("MCS006" in ruleIds, ruleIds.toString())
+        val crashDiag = case.diagnostics.first { it.ruleId == "MCS006" }
+        assertTrue(crashDiag.message.contains("Exception ticking world"), crashDiag.message)
+        assertEquals("crash-reports/crash-2026-11-15_03.30.00-server.txt", crashDiag.artifactPath)
     }
 
     private fun run(scenario: Scenario, vararg flags: String): RunReport =

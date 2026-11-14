@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.report.ConsoleRunReporter
 import com.salyvn.mcstage.report.JsonRunReporter
 import com.salyvn.mcstage.report.JunitXmlRunReporter
+import com.salyvn.mcstage.report.SarifRunReporter
 import com.salyvn.mcstage.run.CaseResult
 import com.salyvn.mcstage.run.LogLine
 import com.salyvn.mcstage.run.RunListener
@@ -28,10 +29,15 @@ import java.nio.file.Files
  */
 abstract class ScenarioCommand(name: String) : McstageCommand(name) {
 
-    protected val format by option("--format", help = "Output format").choice("console", "json", "junit")
+    protected val format by option("--format", help = "Output format").choice("console", "json", "junit", "sarif")
         .default("console")
 
     protected val output by option("-o", "--output", help = "Write the report to this file").path()
+
+    protected val sarif by option(
+        "--sarif",
+        help = "Write an OASIS SARIF v2.1.0 report to this file alongside the primary output",
+    ).path()
 
     protected val tail by option("--tail", help = "Print the server's own output as it arrives").flag()
 
@@ -67,7 +73,17 @@ abstract class ScenarioCommand(name: String) : McstageCommand(name) {
         val text = when (format) {
             "json" -> JsonRunReporter().render(report)
             "junit" -> JunitXmlRunReporter().render(report)
+            "sarif" -> SarifRunReporter().render(report)
             else -> ConsoleRunReporter(color = !noColor && output == null, verbose = verbose).render(report)
+        }
+
+        sarif?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            val sarifText = if (format == "sarif") text else SarifRunReporter().render(report)
+            Files.writeString(target, sarifText)
+            if (output != target) {
+                echo("Wrote sarif report to $target")
+            }
         }
 
         output?.let { target ->

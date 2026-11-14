@@ -1,5 +1,5 @@
 name: 'MCStage Real-Server Plugin Integration Test'
-description: 'Boot real Paper, Folia, and Purpur servers in CI, install built plugin jars, drive console commands, assert logs/files, and emit JUnit XML or JSON reports.'
+description: 'Boot real Paper, Folia, and Purpur servers in CI, install built plugin jars, drive console commands, assert logs/files, and emit JUnit XML, JSON, or OASIS SARIF v2.1.0 reports.'
 author: 'SalyyS1'
 
 branding:
@@ -19,17 +19,26 @@ inputs:
     required: false
     default: ''
   format:
-    description: 'Report format: console, json, or junit'
+    description: 'Report format: console, json, junit, or sarif'
     required: false
     default: 'junit'
   output:
-    description: 'Optional file path to write the JSON or JUnit XML report'
+    description: 'Optional file path to write the primary report'
+    required: false
+    default: ''
+  sarif:
+    description: 'Optional file path to write an OASIS SARIF v2.1.0 report alongside the primary format'
     required: false
     default: ''
   version:
     description: 'MCStage release tag to download'
     required: false
-    default: 'v0.2.0'
+    default: 'v0.3.0'
+
+outputs:
+  sarif-file:
+    description: 'Path to the generated SARIF v2.1.0 report when sarif or format=sarif is configured'
+    value: ${{ steps.run-mcstage.outputs.sarif-file }}
 
 runs:
   using: 'composite'
@@ -60,6 +69,7 @@ runs:
         curl -fsSL "${JAR_URL}" -o "${RUNNER_TEMP}/mcstage/mcstage.jar"
 
     - name: Run MCStage Scenario
+      id: run-mcstage
       shell: bash
       env:
         INPUT_SCENARIO: ${{ inputs.scenario }}
@@ -67,6 +77,7 @@ runs:
         INPUT_PLUGIN: ${{ inputs.plugin }}
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_SARIF: ${{ inputs.sarif }}
       run: |
         set -euo pipefail
         ARGS=("test" "${INPUT_SCENARIO}" "--format" "${INPUT_FORMAT}")
@@ -78,5 +89,11 @@ runs:
         fi
         if [ -n "${INPUT_OUTPUT}" ]; then
           ARGS+=("-o" "${INPUT_OUTPUT}")
+        fi
+        if [ -n "${INPUT_SARIF}" ]; then
+          ARGS+=("--sarif" "${INPUT_SARIF}")
+          echo "sarif-file=${INPUT_SARIF}" >> "${GITHUB_OUTPUT}"
+        elif [ "${INPUT_FORMAT}" = "sarif" ] && [ -n "${INPUT_OUTPUT}" ]; then
+          echo "sarif-file=${INPUT_OUTPUT}" >> "${GITHUB_OUTPUT}"
         fi
         java -jar "${RUNNER_TEMP}/mcstage/mcstage.jar" "${ARGS[@]}"

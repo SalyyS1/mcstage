@@ -24,10 +24,12 @@ object ScenarioFile {
     private val TOP_LEVEL = setOf(
         "name", "platform", "platforms", "version", "versions", "plugin", "plugins", "properties",
         "memory", "java", "jvm-args", "ready", "ready-timeout", "stop", "stop-timeout", "forbid",
-        "steps", "timeout", "allow-prerelease",
+        "crash-guard", "steps", "timeout", "allow-prerelease",
     )
 
-    private val STEP_ACTIONS = setOf("expect", "send", "wait", "enabled", "file-exists", "file-contains")
+    private val STEP_ACTIONS = setOf(
+        "expect", "not-expect", "send", "wait", "enabled", "file-exists", "file-not-exists", "file-contains",
+    )
     private val STEP_KEYS = STEP_ACTIONS + setOf("timeout", "match")
 
     fun read(path: Path): Scenario {
@@ -72,13 +74,16 @@ object ScenarioFile {
             memory = root["memory"]?.toString() ?: "2G",
             java = root["java"]?.toString(),
             jvmArgs = strings(root["jvm-args"], "jvm-args", where),
-            ready = LineMatcher.parse(root["ready"]?.toString() ?: Platform.DEFAULT_READY),
+            ready = parseMatcher(root["ready"]?.toString() ?: Platform.DEFAULT_READY, "ready", where),
             readyTimeout = duration(root["ready-timeout"], "ready-timeout", where)
                 ?: Duration.ofSeconds(180),
             stopCommand = root["stop"]?.toString() ?: Platform.DEFAULT_STOP,
             stopTimeout = duration(root["stop-timeout"], "stop-timeout", where) ?: Duration.ofSeconds(60),
-            forbid = strings(root["forbid"], "forbid", where).map { LineMatcher.parse(it) },
-            allowPrerelease = root["allow-prerelease"] == true,
+            forbid = strings(root["forbid"], "forbid", where).mapIndexed { idx, spec ->
+                parseMatcher(spec, "forbid[$idx]", where)
+            },
+            crashGuard = booleanFlag(root["crash-guard"], "crash-guard", where),
+            allowPrerelease = booleanFlag(root["allow-prerelease"], "allow-prerelease", where),
         )
     }
 
@@ -120,12 +125,18 @@ object ScenarioFile {
                 throw SetupError("$at uses 'match' without 'file-contains'.")
             }
 
-            val timeout = duration(step["timeout"], "timeout", at) ?: defaultTimeout
+            val explicitTimeout = duration(step["timeout"], "timeout", at)
+            val timeout = explicitTimeout ?: defaultTimeout
 
             when {
                 step.containsKey("expect") -> Step.Expect(
-                    matcher = LineMatcher.parse(text(step["expect"], "expect", at)),
+                    matcher = parseMatcher(text(step["expect"], "expect", at), "expect", at),
                     timeout = timeout,
+                )
+
+                step.containsKey("not-expect") -> Step.NotExpect(
+                    matcher = parseMatcher(text(step["not-expect"], "not-expect", at), "not-expect", at),
+                    duration = explicitTimeout ?: Duration.ofSeconds(2),
                 )
 
                 step.containsKey("send") -> Step.Send(text(step["send"], "send", at))
@@ -143,6 +154,11 @@ object ScenarioFile {
                 step.containsKey("file-exists") -> {
                     val rel = InstancePaths.validateRelative(text(step["file-exists"], "file-exists", at), at)
                     Step.FileExists(relativePath = rel, timeout = timeout)
+                }
+
+                step.containsKey("file-not-exists") -> {
+                    val rel = InstancePaths.validateRelative(text(step["file-not-exists"], "file-not-exists", at), at)
+                    Step.FileNotExists(relativePath = rel, duration = explicitTimeout ?: Duration.ZERO)
                 }
 
                 step.containsKey("file-contains") -> parseFileContains(step, timeout, at)
@@ -166,12 +182,24 @@ object ScenarioFile {
             }
             val rel = InstancePaths.validateRelative(text(rawTarget["path"], "file-contains.path", at), at)
             val pattern = text(rawTarget["match"] ?: step["match"], "file-contains.match", at)
-            Step.FileContains(rel, LineMatcher.parse(pattern), timeout)
+            Step.FileContains(rel, parseMatcher(pattern, "file-contains.match", at), timeout)
         } else {
             val rel = InstancePaths.validateRelative(text(rawTarget, "file-contains", at), at)
             val pattern = text(step["match"], "match", at)
-            Step.FileContains(rel, LineMatcher.parse(pattern), timeout)
+            Step.FileContains(rel, parseMatcher(pattern, "match", at), timeout)
         }
+    }
+
+    private fun parseMatcher(spec: String, what: String, where: String): LineMatcher = try {
+        LineMatcher.parse(spec)
+    } catch (e: Exception) {
+        throw SetupError("$where: invalid regular expression in $what: ${oneLine(e.message)}", e)
+    }
+
+    private fun booleanFlag(node: Any?, what: String, where: String): Boolean = when (node) {
+        null -> false
+        is Boolean -> node
+        else -> throw SetupError("$where: $what must be true or false.")
     }
 
     private fun properties(node: Any?, where: String): Map<String, String> {

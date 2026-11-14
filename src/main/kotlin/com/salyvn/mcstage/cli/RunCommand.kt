@@ -98,6 +98,7 @@ class RunCommand : ScenarioCommand(name = "run") {
             stopCommand = base?.stopCommand ?: Platform.DEFAULT_STOP,
             stopTimeout = base?.stopTimeout ?: Duration.ofSeconds(60),
             forbid = (base?.forbid ?: emptyList()) + forbid.map { LineMatcher.parse(it) },
+            crashGuard = base?.crashGuard ?: false,
         )
 
         val runner = ScenarioRunner(
@@ -106,7 +107,7 @@ class RunCommand : ScenarioCommand(name = "run") {
             javaOverride = javaBinary,
             basePort = descriptor.port,
         )
-        emit(runner.run(scenario))
+        emit(runner.run(scenario, scenarioFile = scenarioFile))
     }
 
     /**

@@ -67,6 +67,7 @@ class ValidateCommand : McstageCommand(name = "validate") {
                 put("memory", scenario.memory)
                 put("stepsCount", scenario.steps.size)
                 put("forbidCount", scenario.forbid.size)
+                put("crashGuard", scenario.crashGuard)
                 putJsonArray("cases") {
                     for (c in scenario.cases) add(c.label)
                 }

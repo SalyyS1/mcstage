@@ -1,5 +1,6 @@
 package com.salyvn.mcstage.run
 
+import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.Platform
 import com.salyvn.mcstage.core.SetupError
 import java.nio.file.Path
@@ -15,6 +16,11 @@ sealed interface Step {
         override val describe get() = "expect ${matcher.describe}"
     }
 
+    /** Assert that no console line matches `matcher` over `duration` while draining server output. */
+    data class NotExpect(val matcher: LineMatcher, val duration: Duration) : Step {
+        override val describe get() = "expect nothing ${matcher.describe} for ${Durations.format(duration)}"
+    }
+
     /** Type a command into the console. */
     data class Send(val command: String) : Step {
         override val describe get() = "send \"$command\""
@@ -22,7 +28,7 @@ sealed interface Step {
 
     /** Let the server run, reading its output, so that anything forbidden still gets noticed. */
     data class Wait(val duration: Duration) : Step {
-        override val describe get() = "wait ${com.salyvn.mcstage.core.Durations.format(duration)}"
+        override val describe get() = "wait ${Durations.format(duration)}"
     }
 
     /**
@@ -39,6 +45,16 @@ sealed interface Step {
     /** Wait for a file relative to the server instance directory (e.g. `plugins/Warps/config.yml`) to exist. */
     data class FileExists(val relativePath: String, val timeout: Duration) : Step {
         override val describe get() = "expect file \"$relativePath\" to exist"
+    }
+
+    /** Assert that a confined relative path inside the instance directory does not exist (optionally across `duration`). */
+    data class FileNotExists(val relativePath: String, val duration: Duration) : Step {
+        override val describe: String
+            get() = if (duration.isZero) {
+                "expect file \"$relativePath\" not to exist"
+            } else {
+                "expect file \"$relativePath\" not to exist for ${Durations.format(duration)}"
+            }
     }
 
     /** Wait for a file inside the server instance directory to contain a matching substring or `re:` pattern. */
@@ -100,6 +116,7 @@ data class Scenario(
     val stopCommand: String = Platform.DEFAULT_STOP,
     val stopTimeout: Duration = Duration.ofSeconds(60),
     val forbid: List<LineMatcher> = emptyList(),
+    val crashGuard: Boolean = false,
     val allowPrerelease: Boolean = false,
 ) {
 

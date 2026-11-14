@@ -53,7 +53,7 @@ class JunitXmlRunReporter {
                 appendLine("""      </error>""")
             }
         }
-        if (case.facts.isNotEmpty() || case.steps.isNotEmpty()) {
+        if (case.facts.isNotEmpty() || case.steps.isNotEmpty() || case.diagnostics.isNotEmpty()) {
             appendLine("""      <system-out>${escapeText(summaryOut(case))}</system-out>""")
         }
         appendLine("""    </testcase>""")
@@ -61,6 +61,12 @@ class JunitXmlRunReporter {
 
     private fun detailBody(case: CaseResult): String = buildString {
         case.failure?.let { appendLine("Failure: $it") }
+        if (case.diagnostics.isNotEmpty()) {
+            appendLine("Diagnostics:")
+            for (finding in case.diagnostics) {
+                appendLine("  [${finding.ruleId}] (${finding.severity}) ${finding.message}")
+            }
+        }
         if (case.steps.isNotEmpty()) {
             appendLine("Steps:")
             for (step in case.steps) {
@@ -79,6 +85,9 @@ class JunitXmlRunReporter {
     private fun summaryOut(case: CaseResult): String = buildString {
         for ((k, v) in case.facts) {
             appendLine("$k: $v")
+        }
+        for (finding in case.diagnostics) {
+            appendLine("[${finding.ruleId}] ${finding.message}")
         }
         for (step in case.steps) {
             val mark = if (step.ok) "ok" else "FAIL"

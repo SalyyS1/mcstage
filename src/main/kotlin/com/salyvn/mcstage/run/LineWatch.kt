@@ -32,6 +32,8 @@ class LineWatch(private val forbidden: List<LineMatcher>) {
         return "line ${line.number} ${matcher.describe}, which the scenario forbids$more: ${line.text.trim()}"
     }
 
+    fun firstViolationLine(): LogLine? = violations.firstOrNull()?.second
+
     fun contribute(facts: MutableMap<String, String>) {
         if (warnings > 0) facts["warning lines"] = warnings.toString()
         if (errors > 0) facts["error lines"] = errors.toString()
