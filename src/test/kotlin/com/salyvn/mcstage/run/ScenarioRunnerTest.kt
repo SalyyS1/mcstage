@@ -107,6 +107,35 @@ class ScenarioRunnerTest {
         assertTrue(case.failure!!.contains("exited with code 1"), case.failure!!)
     }
 
+    @Test
+    fun `file-exists and file-contains steps observe files written by server commands`() {
+        val report = run(
+            scenario(
+                Step.Send("write plugins/TestPlugin/warps.yml spawn: world_the_end"),
+                Step.FileExists("plugins/TestPlugin/warps.yml", Duration.ofSeconds(5)),
+                Step.FileContains(
+                    "plugins/TestPlugin/warps.yml",
+                    LineMatcher.parse("re:spawn:\\s+world_the_end"),
+                    Duration.ofSeconds(5),
+                ),
+            ),
+        )
+        val case = report.cases.single()
+        assertEquals(Outcome.PASSED, case.outcome, "failure was ${case.failure}")
+        assertEquals(4, case.steps.size)
+        assertEquals("spawn: world_the_end", case.steps.last().matched)
+    }
+
+    @Test
+    fun `file-exists step fails cleanly when expected file never appears`() {
+        val report = run(
+            scenario(Step.FileExists("plugins/TestPlugin/missing.yml", Duration.ofMillis(350))),
+        )
+        val case = report.cases.single()
+        assertEquals(Outcome.FAILED, case.outcome)
+        assertTrue(case.failure!!.contains("missing.yml"), case.failure!!)
+    }
+
     private fun run(scenario: Scenario, vararg flags: String): RunReport =
         ScenarioRunner(
             preparer = ExistingPreparer(instance()),

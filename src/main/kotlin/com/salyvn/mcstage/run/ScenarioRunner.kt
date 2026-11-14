@@ -2,7 +2,11 @@ package com.salyvn.mcstage.run
 
 import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.JavaRuntime
+import com.salyvn.mcstage.core.PortProbe
 import com.salyvn.mcstage.instance.Instance
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 
@@ -37,9 +41,17 @@ class ScenarioRunner(
         val java = JavaRuntime.detect(javaOverride ?: scenario.java)
         listener.onEvent("java ${java.describe} at ${java.binary}")
 
-        val results = scenario.cases.mapIndexed { index, case ->
+        var nextPreferred = basePort
+        val results = scenario.cases.map { case ->
             listener.onCaseStart(case)
-            val result = runCase(scenario, case, java, basePort + index)
+            val allocated = PortProbe.allocateFreePort(if (basePort <= 0) 0 else nextPreferred)
+            if (basePort > 0 && allocated != nextPreferred) {
+                listener.onEvent("port $nextPreferred is busy on loopback; using free port $allocated")
+            }
+            if (basePort > 0) {
+                nextPreferred = maxOf(nextPreferred + 1, allocated + 1)
+            }
+            val result = runCase(scenario, case, java, allocated)
             listener.onCaseEnd(result)
             result
         }
@@ -125,7 +137,7 @@ class ScenarioRunner(
             listener.onStep(steps.last())
         }
 
-        if (failure == null) failure = runSteps(scenario, server, steps, ::consume)
+        if (failure == null) failure = runSteps(scenario, instance.dir, server, steps, ::consume)
         if (failure == null) failure = watch.firstViolation()
 
         val stop = server.stop(scenario.stopCommand, scenario.stopTimeout.toMillis(), ::consume)
@@ -155,6 +167,7 @@ class ScenarioRunner(
     /** @return the first failure, or null when every step was satisfied. */
     private fun runSteps(
         scenario: Scenario,
+        instanceDir: Path,
         server: ServerProcess,
         steps: MutableList<StepResult>,
         consume: (LogLine) -> Unit,
@@ -182,6 +195,8 @@ class ScenarioRunner(
 
                 is Step.Expect -> await(step.describe, server, step.matcher, step.timeout, consume, took = ::took)
                 is Step.Enabled -> await(step.describe, server, step.matcher, step.timeout, consume, took = ::took)
+                is Step.FileExists -> awaitFileExists(step, instanceDir, server, consume, ::took)
+                is Step.FileContains -> awaitFileContains(step, instanceDir, server, consume, ::took)
             }
 
             steps += result
@@ -211,7 +226,89 @@ class ScenarioRunner(
         )
     }
 
+    private fun awaitFileExists(
+        step: Step.FileExists,
+        instanceDir: Path,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val target = InstancePaths.resolveInside(instanceDir, step.relativePath)
+        val deadlineNanos = System.nanoTime() + step.timeout.toNanos()
+        while (true) {
+            if (Files.exists(target)) {
+                return StepResult(step.describe, ok = true, elapsed = took(), matched = step.relativePath)
+            }
+            val remainingMillis = (deadlineNanos - System.nanoTime()) / 1_000_000L
+            if (remainingMillis <= 0) {
+                return StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = "${step.relativePath} was not created within ${Durations.format(step.timeout)}",
+                )
+            }
+            val drained = server.drain(minOf(FILE_POLL_MILLIS, remainingMillis), consume)
+            if (drained is WaitResult.Exited) {
+                return if (Files.exists(target)) {
+                    StepResult(step.describe, ok = true, elapsed = took(), matched = step.relativePath)
+                } else {
+                    StepResult(
+                        step.describe,
+                        ok = false,
+                        elapsed = took(),
+                        detail = "the server exited with code ${drained.exitCode} before ${step.relativePath} appeared",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun awaitFileContains(
+        step: Step.FileContains,
+        instanceDir: Path,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val target = InstancePaths.resolveInside(instanceDir, step.relativePath)
+        val deadlineNanos = System.nanoTime() + step.timeout.toNanos()
+        var sawFile = false
+        while (true) {
+            if (Files.isRegularFile(target)) {
+                sawFile = true
+                val matchedLine = try {
+                    Files.readAllLines(target, StandardCharsets.UTF_8).firstOrNull { step.matcher.matches(it) }
+                } catch (_: Exception) {
+                    null
+                }
+                if (matchedLine != null) {
+                    return StepResult(step.describe, ok = true, elapsed = took(), matched = matchedLine)
+                }
+            }
+            val remainingMillis = (deadlineNanos - System.nanoTime()) / 1_000_000L
+            if (remainingMillis <= 0) {
+                val why = if (!sawFile) {
+                    "${step.relativePath} was never created within ${Durations.format(step.timeout)}"
+                } else {
+                    "no line in ${step.relativePath} ${step.matcher.describe} within ${Durations.format(step.timeout)}"
+                }
+                return StepResult(step.describe, ok = false, elapsed = took(), detail = why)
+            }
+            val drained = server.drain(minOf(FILE_POLL_MILLIS, remainingMillis), consume)
+            if (drained is WaitResult.Exited) {
+                return StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = "the server exited with code ${drained.exitCode} before ${step.relativePath} matched",
+                )
+            }
+        }
+    }
+
     private companion object {
         const val TAIL_LINES = 40
+        const val FILE_POLL_MILLIS = 75L
     }
 }

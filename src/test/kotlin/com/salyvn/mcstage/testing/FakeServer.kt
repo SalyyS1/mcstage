@@ -66,6 +66,18 @@ object FakeServer {
                 System.out.flush()
                 kotlin.system.exitProcess(3)
             }
+            if (command.startsWith("write ")) {
+                val rest = command.removePrefix("write ")
+                val splitAt = rest.indexOf(' ')
+                if (splitAt > 0) {
+                    val rel = rest.substring(0, splitAt)
+                    val body = rest.substring(splitAt + 1)
+                    val out = java.nio.file.Path.of(rel)
+                    out.parent?.let { java.nio.file.Files.createDirectories(it) }
+                    java.nio.file.Files.writeString(out, body + "\n")
+                    log("INFO", "wrote $rel")
+                }
+            }
         }
         // End of input, which a console that has been closed looks like.
         log("INFO", "Stopping server")

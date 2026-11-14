@@ -1,71 +1,60 @@
 # mcstage
 
 [![build](https://github.com/SalyyS1/mcstage/actions/workflows/build.yml/badge.svg)](https://github.com/SalyyS1/mcstage/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/SalyyS1/mcstage)](https://github.com/SalyyS1/mcstage/releases)
 
-mcstage boots a real Minecraft server, installs your plugin, types commands into its console, and tells
-you whether the lines you expected showed up. It downloads the server itself, verifies the jar against
-the digest its publisher printed, and reuses it forever after, so the whole thing is one command and one
-YAML file:
+`mcstage` boots real Minecraft servers (`paper`, `folia`, `purpur`), installs your built plugin `.jar`, drives
+commands over the server console, asserts on live log lines and generated plugin files, and emits human,
+JSON, or JUnit XML reports. It downloads official server builds, verifies publisher digests (`SHA-256` / `MD5`)
+on both cache write and cache read, and reuses cached jars and worlds across runs:
 
 ```
 $ mcstage test mcstage.yml --accept-eula
 == paper 1.21.4
    ok   boot
+   ok   expect Warps to enable
+   ok   expect file "plugins/Warps/config.yml" to exist
    ok   send "warp reload"
    ok   expect contains "reloaded 4 warps"
 == purpur 1.21.4
    ok   boot
-   ok   send "warp reload"
+   ok   expect Warps to enable
    FAIL expect contains "reloaded 4 warps"
         nothing contains "reloaded 4 warps" within 20.0s
 
 Summary: 1 passed, 1 failed in 53.2s
 ```
 
-Exit code 1, a report you can point at, and the instance directories left on disk with the servers' own
-logs in them.
+Exit code `1` on scenario failure, exit code `2` on setup/environment error, with instance directories and
+`logs/latest.log` preserved on disk for inspection.
 
-## Why this exists
+## Why `mcstage` Exists
 
-Testing a Minecraft plugin properly means running it on a server, and the tools around that problem each
-solve a different half of it. MockBukkit gives you an API to assert against but never starts a server, so
-the failures it cannot have are exactly the interesting ones: a plugin that will not enable on one
-version, a command that throws on Folia, a shutdown that hangs. `run-task` boots a real server and does
-it well, but it is a Gradle plugin, so it belongs to one build tool and one project layout. The Docker
-images are excellent at running a server and are aimed at the person operating it, not the person changing
-the code. And a version matrix — the actual question, "does this still work on the four versions I
-support" — is usually a person doing it by hand, four times, badly.
+Testing a Minecraft plugin properly means booting a real server across the platforms and versions you claim
+to support:
 
-mcstage is the standalone CLI in the middle: no build tool, no daemon, no container, no mocks. It talks to
-the server the way you do, over its console.
+- **API mocks** (such as MockBukkit) never start a real server, so they cannot catch classloading failures on a new Minecraft version, Folia region-thread violations at runtime, broken `plugin.yml` wiring, or hung shutdown hooks.
+- **Build-tool tasks** (such as `run-task`) start a real server well, but belong to a single Gradle layout rather than acting as a standalone multi-platform matrix runner with assertions and JUnit XML output.
+- **Container images** target production operators rather than automated plugin CI scenarios.
 
-## Getting started
+`mcstage` is a single standalone CLI JAR: no build-tool lock-in, no background daemon, no containers, and no mocks.
 
-You need Java 21 or newer to run mcstage. The server you test may want a different Java than the one
-mcstage runs on; `--java` and `MCSTAGE_JAVA` exist for that.
+## Getting Started
 
-Download `mcstage.jar` from the releases page and put it somewhere on your PATH, or wrap it:
+Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
+Download `mcstage-0.2.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage.jar --help
+java -jar mcstage-0.2.0.jar init                          # generates starter mcstage.yml
+java -jar mcstage-0.2.0.jar validate mcstage.yml          # offline schema, matrix, and Java check
+java -jar mcstage-0.2.0.jar test mcstage.yml --accept-eula
 ```
 
-Then write a scenario, or have one written for you:
-
-```sh
-mcstage init                       # writes mcstage.yml
-mcstage test mcstage.yml --accept-eula
-```
-
-The first run downloads a server jar — around 50 MB — and generates a world, so it takes a minute. Every
-run after that reuses both. On this machine the same Paper case took 44 seconds the first time and 22 the
-second.
-
-## A scenario
+## Writing a Scenario (`mcstage.yml`)
 
 ```yaml
 name: warps survive a reload
-platforms: [paper, purpur]
+platforms: [paper, folia, purpur]
 versions: ["latest", "1.21.4"]
 memory: 2G
 
@@ -80,207 +69,106 @@ timeout: 20s
 
 steps:
   - enabled: Warps
+  - file-exists: "plugins/Warps/config.yml"
   - send: "warp set spawn"
   - expect: "set warp spawn"
+  - file-contains: "plugins/Warps/warps.yml"
+    match: "spawn"
   - send: "warp reload"
-  - expect: "reloaded 1 warp"
+  - expect: re:reloaded \d+ warps?
   - wait: 5s
 ```
 
-Two platforms and two versions is four servers, run one after another. `docs/scenarios.md` documents every
-key; the short version is that a step is one of `expect`, `send`, `wait` or `enabled`, a string is a
-substring unless it starts with `re:`, and anything in `forbid` is checked against every line for the whole
-run rather than at one point in it.
+Three platforms across two versions expands to a 6-server matrix run sequentially. Every key and step type
+(`expect`, `send`, `wait`, `enabled`, `file-exists`, `file-contains`) is documented in [`docs/scenarios.md`](docs/scenarios.md).
 
-## The commands
+## CLI Commands
 
-| Command | What it does |
+| Command | Description |
 | --- | --- |
-| `mcstage test <file>` | Runs a scenario against every platform and version it names. This is the CI command. |
-| `mcstage run <dir>` | Boots an instance that already exists. With `--expect` it asserts; with `--attach` it hands you the console. |
-| `mcstage create <dir>` | Downloads a build and lays out an instance, without starting it. |
-| `mcstage versions [platform]` | What Paper, Folia and Purpur currently publish. |
-| `mcstage cache` | What has been downloaded, and `--clear` to be rid of it. |
-| `mcstage init [file]` | Writes a scenario to start from. |
+| `mcstage test <file>` | Run a scenario across every `(platform, version)` pair (`--format console\|json\|junit`). |
+| `mcstage validate <file>` | Offline dry-run validation of YAML schema, typo hints, matrix cases, Java runtime, and `--check-plugins` globs. |
+| `mcstage run <dir>` | Boot an existing server instance (`--expect` to assert, or `--attach` for interactive console dev loop). |
+| `mcstage create <dir>` | Download a verified build and prepare an instance directory without starting it. |
+| `mcstage versions [platform]` | List versions currently published by Paper, Folia, and Purpur APIs. |
+| `mcstage cache` | Inspect digest-addressed cached server jars (`--clear` to purge). |
+| `mcstage init [file]` | Scaffold a starter `mcstage.yml` scenario. |
 
-The development loop that is not a test run is `run --attach`:
+Interactive local development without hand-maintaining start scripts:
 
 ```sh
 mcstage create dev --platform paper --version 1.21.4 --accept-eula
 mcstage run dev --plugin build/libs/warps-1.4.jar --attach
 ```
 
-That boots the instance, copies the jar you just built into `plugins/`, prints the server's output, and
-forwards what you type to its console. It is the server directory and start script you would otherwise keep
-by hand, without keeping them.
+## Safety & Determinism by Design
 
-## What it decides, and what it only reports
+- **Explicit EULA Agreement:** `mcstage` never sets `-Dcom.mojang.eula.agree=true` behind your back. `eula.txt` is written only when `--accept-eula` is explicitly passed; otherwise setup exits with code `2`.
+- **Loopback-Only Binding & Automatic Free-Port Probing:** Test instances bind to `127.0.0.1` with `online-mode=false`, `enable-rcon=false`, and `enable-query=false`. If port `25565` is already occupied on loopback (or `--port 0` is passed), `mcstage` automatically allocates an unused local port so concurrent local servers never collide.
+- **Re-Verified Digest Cache (`~/.mcstage/jars`):** Downloaded server jars are stored by publisher digest (`sha256-...` for Paper/Folia, `md5-...` for Purpur) and re-hashed on every cache read as well as download. `--offline` disables all network calls.
+- **Confined Filesystem Assertions:** `file-exists` and `file-contains` steps reject path traversal (`..`) and absolute paths, polling strictly inside the instance directory while continuing to drain live server logs and check `forbid` rules.
+- **Signal vs Noise Separation:** Stock Paper servers log benign warnings/errors on boot (such as offline-mode notices). `mcstage` records warning/error/exception counts as report facts and fails only on timed-out steps, unexpected server exits, hung shutdowns, or explicit `forbid` matches.
 
-mcstage fails a case for three reasons: a step was not satisfied in time, the server died, or a line the
-scenario forbade appeared. That is the whole list, and everything else it notices is reported as a number
-rather than turned into a verdict.
-
-This matters more than it sounds. A stock Paper 1.21.4 with no plugins at all prints four warnings and one
-error on a normal boot — the warnings are the offline-mode banner, and the error is Paper's own version
-check failing against an endpoint that has since moved:
-
-```
-[Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!
-[Thread-5/ERROR]: [PaperVersionFetcher] Error while parsing version
-java.io.FileNotFoundException: https://api.papermc.io/v2/projects/paper/versions/1.21.4
-```
-
-A harness that failed the build on any `ERROR` line would fail on a clean server, so people would turn it
-off, and then it would catch nothing. mcstage counts those lines, prints the counts, and leaves the decision
-about which of them matter to the `forbid` list in your scenario, where you can see it and change it.
-
-## The EULA is yours to accept
-
-A Minecraft server will not start until `eula.txt` says `eula=true`, and that line means somebody agreed to
-Mojang's terms. mcstage writes it only when you pass `--accept-eula`, and it never uses the JVM property
-that bypasses the file. Without the flag the instance is still created and the run stops with exit code 2
-and a sentence saying which file is missing and why.
-
-## Test servers stay off the network
-
-An instance mcstage creates gets `server-ip=127.0.0.1` and `online-mode=false`. The second setting is why
-the first one is not optional: a server that does not authenticate anybody, listening on an address the
-network can reach, is a server anyone nearby can join as any name. Paper says so itself in four warning
-lines every boot, which is where those four warnings above came from.
-
-If you pass `--bind` something other than loopback while offline mode is on, mcstage prints what that
-means. It does not stop you — it is your machine — but it does not do it quietly either. `enable-rcon` and
-`enable-query` are written as `false`, because commands go in over the process's own standard input and no
-port needs opening for that.
-
-Keys you set yourself are left alone when an instance is re-created, so an edit made to test something
-survives a move to a newer build. Only `server-port` and `server-ip` are rewritten every time, because
-those two belong to mcstage.
-
-## The jar cache
-
-Downloaded server jars live in `~/.mcstage/jars` — or `$MCSTAGE_HOME/jars`, which is what to point at a
-cache your CI restores between builds — laid out by digest:
-
-```
-~/.mcstage/jars/paper/sha256-5ee4f542.../paper-1.21.4-232.jar
-~/.mcstage/jars/purpur/md5-e3832b46.../purpur-1.21.4-2416.jar
-```
-
-The digest is the identity, so two projects testing the same build share one file, and a build that is
-republished under the same number lands somewhere new instead of overwriting what was already verified.
-Every jar is re-hashed on the way out of the cache as well as on the way in; a cache that is not
-re-verified is just a directory of files whose contents nobody has checked.
-
-Paper's API publishes a SHA-256 and addresses the download by it. Purpur publishes an MD5, so that is what
-gets checked for Purpur, and mcstage says which algorithm it used rather than implying the two are equally
-strong. If a download does not match, the file is deleted and the run stops.
-
-`--offline` turns the network off entirely: anything already cached works, anything else is an error that
-names what is missing.
-
-## Exit codes
+## Exit Codes
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Every case passed. |
-| 1 | A server ran and disagreed with the scenario. |
-| 2 | Nothing was tested: no such version, a download that failed, no Java, an unaccepted EULA, a scenario that does not parse. |
+| `0` | Every `(platform, version)` case passed all steps and `forbid` checks. |
+| `1` | One or more servers booted and failed a scenario assertion, `forbid` rule, or clean shutdown. |
+| `2` | Setup error before testing (invalid YAML, missing plugin glob, unaccepted EULA, missing Java, or network failure). |
 
-The difference between 1 and 2 is the point. A job that cannot tell "the plugin is broken" from "the
-download failed" will eventually be ignored for both.
+## GitHub Actions Integration (`action.yml` + JUnit XML)
 
-## In CI
+Use the composite action `SalyyS1/mcstage@v0.2.0` (which automatically sets up Java 21 and caches `~/.mcstage/jars`):
 
 ```yaml
-name: plugin
+name: integration
 on: [push, pull_request]
 
 jobs:
-  servers:
+  mcstage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 21 }
-      - run: ./gradlew build
-      - uses: actions/cache@v4
         with:
-          path: ~/.mcstage/jars
-          key: mcstage-jars-${{ hashFiles('mcstage.yml') }}
-      - run: java -jar mcstage.jar test mcstage.yml --accept-eula --format json -o mcstage-report.json
+          distribution: temurin
+          java-version: '21'
+      - run: ./gradlew build --no-daemon
+
+      - name: Run Real-Server Matrix
+        uses: SalyyS1/mcstage@v0.2.0
+        with:
+          scenario: mcstage.yml
+          accept-eula: 'true'
+          format: junit
+          output: build/test-results/mcstage.xml
+
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: mcstage-report, path: mcstage-report.json }
+        with:
+          name: mcstage-junit-report
+          path: build/test-results/mcstage.xml
 ```
 
-Caching `~/.mcstage/jars` is worth doing: it is the difference between a minute of downloading per run and
-none. The `--accept-eula` in a workflow file is a real agreement made by whoever owns the repository, which
-is why it is written there in the open rather than defaulted somewhere.
+## Related Salyvn Minecraft Toolchain
 
-## What it does not do
+- [foliascan](https://github.com/SalyyS1/foliascan): Static bytecode analyzer for Paper-to-Folia regionized multithreading safety with SARIF v2.1.0 output.
+- [pluginscope](https://github.com/SalyyS1/pluginscope): Deep static inspector for Bukkit/Paper/Folia plugin JARs, permissions, commands, and bytecode risks.
+- [serverdoctor](https://github.com/SalyyS1/serverdoctor): Offline auditor and diagnostic analyzer for Minecraft server configurations, crash reports, and timings.
+- [minecraftkit](https://github.com/SalyyS1/minecraftkit): MCP server giving AI coding assistants Paper/Folia migration, crash-log, and server tooling.
+- [packmerge](https://github.com/SalyyS1/packmerge) / [packmigrate](https://github.com/SalyyS1/packmigrate) / [glyphsmith](https://github.com/SalyyS1/glyphsmith) / [shadersmith](https://github.com/SalyyS1/shadersmith): Resource pack, custom font, item definition, and GLSL shader contract CLIs.
 
-- **No proxies.** The fill API serves Velocity too, and mcstage does not offer it. A proxy has no world, no
-  EULA and no `server.properties`, and its generated configuration binds to every interface, so supporting
-  one means a second creation path with different assumptions. It is not here until it has been run against.
-- **No client.** Nothing here logs in or plays. If your plugin needs a player to be tested, mcstage gets you
-  as far as a running server with the plugin enabled and a console you can drive.
-- **No mocks.** The point is the real jar.
-- **No opinion about which Java a version needs.** That mapping changes with every Minecraft release, and it
-  is the server's own error message when it is wrong. mcstage reports the Java it detected with every case
-  and lets the server refuse for itself, next to the version that caused it.
-- **No advice.** It reports what happened and does not suggest what to change.
-
-If you want the other direction — reading what a server has already produced, or what is inside a plugin jar
-— that is what [serverdoctor](https://github.com/SalyyS1/serverdoctor), [pluginscope](https://github.com/SalyyS1/pluginscope)
-and [foliascan](https://github.com/SalyyS1/foliascan) are for.
-
-## How the console actually works
-
-Commands are written to the server process's standard input, which is worth explaining because it is the
-part people assume cannot work when the process is not attached to a terminal.
-
-Paper replaces vanilla's console reader with its own (`PaperConsole`, which extends Minecrell's
-`SimpleTerminalConsole`). That class asks JLine for a system terminal and, when there is not one — which is
-exactly the case for a pipe — falls back to reading `System.in` line by line. Each line goes to
-`handleConsoleInput`, which puts it on a concurrent queue that the tick thread drains; Folia drains the same
-queue on its global region tick. So piped commands arrive, and a command sent before the server is ready is
-queued rather than dropped. The only visible difference from a terminal is one warning line saying advanced
-terminal features are not available.
-
-Output is read from the process rather than from `logs/latest.log`: nothing is missed before the log file is
-opened, a line that a crash prevents from being flushed is still seen, and standard error — where a JVM
-prints the reason it refused to start at all — arrives in the same stream in the order it happened. Both
-directions are pinned to UTF-8, and the server is started with `-Dfile.encoding`, `-Dstdout.encoding` and
-`-Dstderr.encoding` set to match, so that reading it as UTF-8 is correct rather than lucky.
-
-## Building it
+## Building from Source
 
 ```sh
-./gradlew build          # tests, then the shaded jar in build/libs
+./gradlew build --no-daemon
 ```
 
-Kotlin 2.4.10 on a Java 21 toolchain, Gradle 9.7.1, one shaded jar with SnakeYAML, Clikt and
-kotlinx.serialization inside. The tests start a real child JVM that behaves like a server on request —
-dying during start-up, ignoring `stop`, printing a stack trace at the wrong moment — because those are the
-cases a real server will not perform on cue.
+Kotlin 2.4.10 on Java 21, Gradle 9.7.1, producing a reproducible shaded JAR in `build/libs/`. Runner tests spawn real child JVMs over piped UTF-8 `stdin`/`stdout` to exercise startup crashes, console commands, file assertions, forbidden stack traces, and hung shutdowns deterministically.
 
-## Credits
+## Credits & License
 
-The `NOTICE` file lists what mcstage depends on, where each fact about server behaviour was read from, and
-the projects that solved a neighbouring problem first. `run-task`, MockBukkit, `mc-runtime-test`,
-`docker-minecraft-server` and `mcrcon` are all worth knowing about; none of their code is in here, and
-reading them shaped what this does and does not try to do.
-
-Server jars come from PaperMC's fill API and Purpur's API. mcstage is an independent project and is not
-affiliated with, endorsed by or sponsored by PaperMC, PurpurMC, Mojang or Microsoft.
-
-## Licence
+See `NOTICE` for upstream API and design references (`run-task`, MockBukkit, `mc-runtime-test`, `docker-minecraft-server`, `mcrcon`). Server builds are fetched from PaperMC Fill API and Purpur API. Independent project; not affiliated with PaperMC, PurpurMC, Mojang, or Microsoft.
 
 Apache-2.0. See `LICENSE`.
-
-
-
-
-
-

@@ -126,6 +126,54 @@ class ScenarioFileTest {
         assertEquals("paper-1.21.4-rc1", scenario.cases.single().slug)
     }
 
+    @Test
+    fun `parses file-exists and file-contains steps and rejects traversal paths`() {
+        val scenario = write(
+            """
+            platform: paper
+            version: "1.21.4"
+            steps:
+              - file-exists: "plugins/Warps/config.yml"
+                timeout: 5s
+              - file-contains: "plugins/Warps/warps.yml"
+                match: "re:spawn:\\s+world"
+              - file-contains:
+                  path: "plugins/Warps/data.txt"
+                  match: "ready=true"
+            """,
+        )
+        assertEquals(3, scenario.steps.size)
+        val exists = scenario.steps[0] as Step.FileExists
+        assertEquals("plugins/Warps/config.yml", exists.relativePath)
+        assertEquals(Duration.ofSeconds(5), exists.timeout)
+
+        val containsRegex = scenario.steps[1] as Step.FileContains
+        assertEquals("plugins/Warps/warps.yml", containsRegex.relativePath)
+        assertTrue(containsRegex.matcher.matches("spawn:  world"))
+
+        val containsNested = scenario.steps[2] as Step.FileContains
+        assertEquals("plugins/Warps/data.txt", containsNested.relativePath)
+        assertTrue(containsNested.matcher.matches("state ready=true ok"))
+
+        val traversal = assertThrows<SetupError> {
+            write("steps:\n  - file-exists: \"../outside.txt\"\n")
+        }
+        assertTrue(traversal.message!!.contains("inside the server instance"), traversal.message!!)
+
+        val absolute = assertThrows<SetupError> {
+            write("steps:\n  - file-exists: \"/etc/passwd\"\n")
+        }
+        assertTrue(absolute.message!!.contains("relative"), absolute.message!!)
+    }
+
+    @Test
+    fun `mistyped key suggests closest known key`() {
+        val err = assertThrows<SetupError> {
+            write("platform: paper\ntimout: 10s\nsteps:\n  - expect: x\n")
+        }
+        assertTrue(err.message!!.contains("Did you mean 'timeout'?"), err.message!!)
+    }
+
     private fun write(text: String): Scenario {
         val file = dir.resolve("scenario.yml")
         Files.writeString(file, text.trimIndent())

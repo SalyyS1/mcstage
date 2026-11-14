@@ -1,0 +1,82 @@
+name: 'MCStage Real-Server Plugin Integration Test'
+description: 'Boot real Paper, Folia, and Purpur servers in CI, install built plugin jars, drive console commands, assert logs/files, and emit JUnit XML or JSON reports.'
+author: 'SalyyS1'
+
+branding:
+  icon: 'terminal'
+  color: 'green'
+
+inputs:
+  scenario:
+    description: 'Path to the mcstage scenario YAML file'
+    required: true
+    default: 'mcstage.yml'
+  accept-eula:
+    description: 'Set to true to write eula=true in each test server instance (records agreement to https://aka.ms/MinecraftEULA)'
+    required: true
+  plugin:
+    description: 'Optional extra plugin jar or glob path appended to scenario plugins'
+    required: false
+    default: ''
+  format:
+    description: 'Report format: console, json, or junit'
+    required: false
+    default: 'junit'
+  output:
+    description: 'Optional file path to write the JSON or JUnit XML report'
+    required: false
+    default: ''
+  version:
+    description: 'MCStage release tag to download'
+    required: false
+    default: 'v0.2.0'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Java 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Cache MCStage Server JARs
+      uses: actions/cache@v4
+      with:
+        path: ~/.mcstage/jars
+        key: mcstage-jars-${{ hashFiles(inputs.scenario) }}
+        restore-keys: |
+          mcstage-jars-
+
+    - name: Download MCStage CLI
+      shell: bash
+      env:
+        MCSTAGE_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        VERSION_NUM="${MCSTAGE_VERSION#v}"
+        JAR_URL="https://github.com/SalyyS1/mcstage/releases/download/${MCSTAGE_VERSION}/mcstage-${VERSION_NUM}.jar"
+        mkdir -p "${RUNNER_TEMP}/mcstage"
+        curl -fsSL "${JAR_URL}" -o "${RUNNER_TEMP}/mcstage/mcstage.jar"
+
+    - name: Run MCStage Scenario
+      shell: bash
+      env:
+        INPUT_SCENARIO: ${{ inputs.scenario }}
+        INPUT_EULA: ${{ inputs.accept-eula }}
+        INPUT_PLUGIN: ${{ inputs.plugin }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+      run: |
+        set -euo pipefail
+        ARGS=("test" "${INPUT_SCENARIO}" "--format" "${INPUT_FORMAT}")
+        if [ "${INPUT_EULA}" = "true" ]; then
+          ARGS+=("--accept-eula")
+        fi
+        if [ -n "${INPUT_PLUGIN}" ]; then
+          ARGS+=("--plugin" "${INPUT_PLUGIN}")
+        fi
+        if [ -n "${INPUT_OUTPUT}" ]; then
+          ARGS+=("-o" "${INPUT_OUTPUT}")
+        fi
+        java -jar "${RUNNER_TEMP}/mcstage/mcstage.jar" "${ARGS[@]}"

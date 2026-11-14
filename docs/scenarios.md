@@ -1,11 +1,12 @@
 # Scenario files
 
 A scenario is a YAML mapping. It says which servers to run, what to install on them, what to type, and what
-must or must not appear in the output. `mcstage test <file>` runs it; every platform is tried against every
-version, one server at a time.
+must appear in the console output or instance filesystem. `mcstage test <file>` runs it; every platform is
+tried against every version, one server at a time. `mcstage validate <file> [--check-plugins]` checks the
+scenario offline before starting any server.
 
-An unknown key is an error rather than something quietly ignored, so a mistyped `timout:` stops the run
-instead of doing nothing.
+An unknown key is an error (with a typo suggestion when close to a known key) rather than something quietly
+ignored, so a mistyped `timout:` stops immediately instead of doing nothing.
 
 ## Top level
 
@@ -28,7 +29,7 @@ instead of doing nothing.
 | `timeout` | `60s` | The default timeout for a step that does not give its own. |
 | `steps` | required | What to do once the server is ready. |
 
-## Matching a line
+## Matching a line or file content
 
 A string is a substring, matched case-sensitively:
 
@@ -44,56 +45,41 @@ forbid:
   - re:Exception in thread "Server thread"
 ```
 
-There is nothing in between. Guessing which one was meant produces a matcher that works until the day a
-plugin is called `C++`.
-
-Both forms are applied to the server's output as it arrives, standard error included.
+Both forms apply identically to console output (`expect`, `forbid`) and file content (`file-contains`).
 
 ## Steps
 
-A step is a mapping with exactly one action, plus an optional `timeout`.
+A step is a mapping with one action, plus an optional `timeout`.
 
 ```yaml
 steps:
-  - enabled: Warps          # wait for the plugin manager to report Warps enabling
+  - enabled: Warps                       # wait for the plugin manager to report Warps enabling
     timeout: 60s
-  - send: "warp set spawn"  # type a command into the console
-  - expect: "set warp"      # wait for a line
-  - wait: 5s                # let the server run, still watching for forbidden lines
+  - file-exists: "plugins/Warps/config.yml"
+  - send: "warp set spawn"               # type a command into the console
+  - expect: "set warp"                   # wait for a console line
+  - file-contains: "plugins/Warps/warps.yml"
+    match: "re:spawn:\\s+world"          # wait for a matching line inside an instance file
+    timeout: 5s
+  - wait: 5s                             # let the server run, still watching for forbidden lines
 ```
 
-`enabled: Warps` waits for the line Bukkit's plugin manager logs through the plugin's own logger as it
-enables it — `Enabling Warps v1.4` — so it is satisfied at the moment `onEnable` is reached, before anything
-the plugin itself prints. `NOTICE` cites where that message comes from.
+- `enabled: Warps` waits for Bukkit's plugin manager log line (`Enabling Warps v1.4`), satisfied as `onEnable` runs.
+- `send` writes a command to the server's standard input without waiting. Follow it with `expect`, `file-exists`, or `file-contains`.
+- `file-exists` and `file-contains` poll a relative path confined inside the server instance directory while continuing to drain live server logs and enforce `forbid` rules. Paths containing `..` or absolute roots are rejected at validation time.
+- `wait` drains server logs for the given duration so forbidden lines or unexpected exits during background tasks are caught.
 
-`send` does not wait for anything. Follow it with an `expect` when the point is what it printed.
+## Reports (`console`, `json`, `junit`)
 
-`wait` is not padding: forbidden patterns are checked while it runs, so it is how you say "and nothing blew
-up in the next five seconds".
+`--format` selects `console` (default), `json` (structured CI JSON), or `junit` (standard JUnit XML `<testsuites>` for GitHub Actions test reporters, GitLab CI, and Jenkins).
 
-A step that times out fails the case and the report says what it was waiting for. So does the server dying
-at any point, and so does anything in `forbid` appearing, even when every step was satisfied.
+## Instances and Port Allocation
 
-## What is reported but never fails a run
+Each case gets a directory under `.mcstage` next to the scenario file (`--work` moves it) named after the platform and version. Worlds and server jars are reused across runs; `--clean` deletes instance directories first.
 
-Every case reports the build it resolved to, the jar and its digest, the Java it used, how long it took to
-become ready, how many lines it printed, how many carried a warning or error level, how many looked like a
-thrown exception, and where the instance directory is.
+Ports start at `--port` (`25565` by default, or `0` for OS ephemeral ports) and automatically advance past any loopback port already bound on the host machine.
 
-Those counts are facts, not verdicts. A stock Paper with no plugins prints four warnings and one error on a
-normal boot, so a harness that failed on either would fail on a clean server. If one of them matters to you,
-put it in `forbid`, where it is visible and yours.
-
-## Instances
-
-Each case gets a directory under `.mcstage` next to the scenario file — `--work` moves it — named after the
-platform and version. It is reused between runs, so the world and therefore the second boot are faster, and
-when something fails the directory is still there with the server's own `logs/latest.log` in it. `--clean`
-deletes them first.
-
-Ports are allocated from `--port` (25565 by default) upwards, one per case.
-
-## A full example
+## Full example
 
 ```yaml
 name: warps survive a reload on everything I support
@@ -117,15 +103,17 @@ timeout: 20s
 
 steps:
   - enabled: Warps
+  - file-exists: "plugins/Warps/config.yml"
   - send: "warp set spawn"
   - expect: "set warp spawn"
+  - file-contains: "plugins/Warps/warps.yml"
+    match: "spawn"
   - send: "warp reload"
   - expect: re:reloaded \d+ warps?
   - wait: 5s
 ```
 
-Six servers, one command, and an exit code that means something:
-
 ```sh
-mcstage test warps.yml --accept-eula --format json -o warps-report.json
+mcstage validate warps.yml --check-plugins
+mcstage test warps.yml --accept-eula --format junit -o build/test-results/mcstage.xml
 ```

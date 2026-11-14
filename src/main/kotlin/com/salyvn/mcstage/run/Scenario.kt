@@ -1,14 +1,16 @@
 package com.salyvn.mcstage.run
 
 import com.salyvn.mcstage.core.Platform
+import com.salyvn.mcstage.core.SetupError
+import java.nio.file.Path
 import java.time.Duration
 
-/** One instruction in a scenario. Four kinds, which between them cover a console session. */
+/** One instruction in a scenario: console interaction, timing, or instance filesystem assertions. */
 sealed interface Step {
 
     val describe: String
 
-    /** Wait for a line. The only step that can fail on its own. */
+    /** Wait for a line. */
     data class Expect(val matcher: LineMatcher, val timeout: Duration) : Step {
         override val describe get() = "expect ${matcher.describe}"
     }
@@ -32,6 +34,47 @@ sealed interface Step {
     data class Enabled(val plugin: String, val timeout: Duration) : Step {
         val matcher: LineMatcher get() = LineMatcher.Pattern("Enabling ${Regex.escape(plugin)}")
         override val describe get() = "expect $plugin to enable"
+    }
+
+    /** Wait for a file relative to the server instance directory (e.g. `plugins/Warps/config.yml`) to exist. */
+    data class FileExists(val relativePath: String, val timeout: Duration) : Step {
+        override val describe get() = "expect file \"$relativePath\" to exist"
+    }
+
+    /** Wait for a file inside the server instance directory to contain a matching substring or `re:` pattern. */
+    data class FileContains(
+        val relativePath: String,
+        val matcher: LineMatcher,
+        val timeout: Duration,
+    ) : Step {
+        override val describe get() = "expect file \"$relativePath\" ${matcher.describe}"
+    }
+}
+
+/** Ensures scenario file assertions never escape the server instance directory. */
+object InstancePaths {
+    fun validateRelative(raw: String, where: String): String {
+        val normalized = raw.trim().replace('\\', '/')
+        if (normalized.isEmpty()) {
+            throw SetupError("$where: file path cannot be empty.")
+        }
+        if (normalized.startsWith("/") || Regex("^[A-Za-z]:").containsMatchIn(normalized)) {
+            throw SetupError("$where: file path '$raw' must be relative to the server instance directory.")
+        }
+        val segments = normalized.split('/')
+        if (segments.any { it.isEmpty() || it == "." || it == ".." }) {
+            throw SetupError("$where: file path '$raw' must stay inside the server instance directory.")
+        }
+        return normalized
+    }
+
+    fun resolveInside(instanceDir: Path, relativePath: String): Path {
+        val root = instanceDir.toAbsolutePath().normalize()
+        val resolved = root.resolve(relativePath).normalize()
+        if (!resolved.startsWith(root) || resolved == root) {
+            throw SetupError("File path '$relativePath' escapes instance directory $root.")
+        }
+        return resolved
     }
 }
 

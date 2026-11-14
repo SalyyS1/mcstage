@@ -100,7 +100,7 @@ class Instance(val dir: Path) {
         if (sources.isEmpty()) return installedPlugins()
         Files.createDirectories(pluginsDir)
         for (source in sources) {
-            val matches = expand(source)
+            val matches = matchingPluginJars(source)
             if (matches.isEmpty()) throw SetupError("No plugin jar matched '$source'.")
             for (jar in matches) {
                 Files.copy(
@@ -113,33 +113,33 @@ class Instance(val dir: Path) {
         return installedPlugins()
     }
 
-    private fun expand(source: String): List<Path> {
-        if (!source.contains('*') && !source.contains('?')) {
-            val path = Path.of(source)
-            return when {
-                path.isRegularFile() -> listOf(path)
-                path.isDirectory() -> path.listDirectoryEntries()
-                    .filter { it.isRegularFile() && it.name.endsWith(".jar", ignoreCase = true) }
-                    .sorted()
+    companion object {
+        private val JSON = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-                else -> emptyList()
+        fun matchingPluginJars(source: String): List<Path> {
+            if (!source.contains('*') && !source.contains('?')) {
+                val path = Path.of(source)
+                return when {
+                    path.isRegularFile() -> listOf(path)
+                    path.isDirectory() -> path.listDirectoryEntries()
+                        .filter { it.isRegularFile() && it.name.endsWith(".jar", ignoreCase = true) }
+                        .sorted()
+
+                    else -> emptyList()
+                }
             }
+
+            // A glob cannot be turned into a Path first: Windows rejects an asterisk in a path outright, so
+            // `Path.of("build/libs/x-*.jar")` throws before there is anything to match against. Split the
+            // text instead, and only the directory part becomes a path.
+            val boundary = source.lastIndexOfAny(charArrayOf('/', '\\'))
+            val parent = Path.of(if (boundary < 0) "." else source.substring(0, boundary).ifEmpty { "/" })
+            if (!parent.isDirectory()) return emptyList()
+
+            val matcher = parent.fileSystem.getPathMatcher("glob:${source.substring(boundary + 1)}")
+            return parent.listDirectoryEntries()
+                .filter { it.isRegularFile() && matcher.matches(it.fileName) }
+                .sorted()
         }
-
-        // A glob cannot be turned into a Path first: Windows rejects an asterisk in a path outright, so
-        // `Path.of("build/libs/x-*.jar")` throws before there is anything to match against. Split the
-        // text instead, and only the directory part becomes a path.
-        val boundary = source.lastIndexOfAny(charArrayOf('/', '\\'))
-        val parent = Path.of(if (boundary < 0) "." else source.substring(0, boundary).ifEmpty { "/" })
-        if (!parent.isDirectory()) return emptyList()
-
-        val matcher = parent.fileSystem.getPathMatcher("glob:${source.substring(boundary + 1)}")
-        return parent.listDirectoryEntries()
-            .filter { it.isRegularFile() && matcher.matches(it.fileName) }
-            .sorted()
-    }
-
-    private companion object {
-        val JSON = Json { prettyPrint = true; ignoreUnknownKeys = true }
     }
 }

@@ -3,13 +3,14 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-java@v4
         with:
@@ -18,8 +19,6 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # The runner tests start real child JVMs that behave like servers, which is where the console
-      # plumbing is actually covered. No Minecraft server is downloaded here.
       - name: Test and build
         run: ./gradlew build --no-daemon
 
@@ -30,14 +29,15 @@ jobs:
           java -jar "$JAR" --version
           java -jar "$JAR" --help
           java -jar "$JAR" test --help
+          java -jar "$JAR" validate --help
 
-      - name: A scenario written by init is one that parses
+      - name: Scenario init and offline validate succeed
         run: |
           set -euo pipefail
           JAR=$(ls build/libs/mcstage-*.jar | grep -v thin)
           java -jar "$JAR" init /tmp/generated.yml
-          # No EULA was accepted and nothing is cached, so this must stop at setup rather than boot a
-          # server: exit code 2, not 0 and not 1.
+          java -jar "$JAR" validate /tmp/generated.yml --json > /tmp/validated.json
+          jq -e '.valid == true and (.cases | length == 1)' /tmp/validated.json
           set +e
           java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work > /tmp/out.txt 2>&1
           code=$?
@@ -45,17 +45,18 @@ jobs:
           cat /tmp/out.txt
           test "$code" = "2" || { echo "expected exit code 2 for a run that could not start, got $code"; exit 1; }
 
-      - name: A mistyped scenario key is refused
+      - name: A mistyped scenario key is refused with a suggestion
         run: |
           set -euo pipefail
           JAR=$(ls build/libs/mcstage-*.jar | grep -v thin)
           printf 'platform: paper\ntimout: 30s\nsteps:\n  - expect: "Done ("\n' > /tmp/bad.yml
           set +e
-          java -jar "$JAR" test /tmp/bad.yml --offline > /tmp/bad.txt 2>&1
+          java -jar "$JAR" validate /tmp/bad.yml > /tmp/bad.txt 2>&1
           code=$?
           set -e
           cat /tmp/bad.txt
           grep -q "timout" /tmp/bad.txt || { echo "the error should name the key"; exit 1; }
+          grep -q "timeout" /tmp/bad.txt || { echo "the error should suggest timeout"; exit 1; }
           test "$code" = "2" || { echo "expected exit code 2, got $code"; exit 1; }
 
       - name: The version listing works against the live APIs
@@ -65,7 +66,7 @@ jobs:
           java -jar "$JAR" versions paper -n 3
           java -jar "$JAR" versions purpur -n 3
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: mcstage-jar

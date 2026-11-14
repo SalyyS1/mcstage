@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.report.ConsoleRunReporter
 import com.salyvn.mcstage.report.JsonRunReporter
+import com.salyvn.mcstage.report.JunitXmlRunReporter
 import com.salyvn.mcstage.run.CaseResult
 import com.salyvn.mcstage.run.LogLine
 import com.salyvn.mcstage.run.RunListener
@@ -27,7 +28,7 @@ import java.nio.file.Files
  */
 abstract class ScenarioCommand(name: String) : McstageCommand(name) {
 
-    protected val format by option("--format", help = "Output format").choice("console", "json")
+    protected val format by option("--format", help = "Output format").choice("console", "json", "junit")
         .default("console")
 
     protected val output by option("-o", "--output", help = "Write the report to this file").path()
@@ -65,6 +66,7 @@ abstract class ScenarioCommand(name: String) : McstageCommand(name) {
     protected fun emit(report: RunReport) {
         val text = when (format) {
             "json" -> JsonRunReporter().render(report)
+            "junit" -> JunitXmlRunReporter().render(report)
             else -> ConsoleRunReporter(color = !noColor && output == null, verbose = verbose).render(report)
         }
 

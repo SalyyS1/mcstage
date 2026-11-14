@@ -10,6 +10,7 @@ import com.salyvn.mcstage.cli.CreateCommand
 import com.salyvn.mcstage.cli.InitCommand
 import com.salyvn.mcstage.cli.RunCommand
 import com.salyvn.mcstage.cli.TestCommand
+import com.salyvn.mcstage.cli.ValidateCommand
 import com.salyvn.mcstage.cli.VersionsCommand
 import com.salyvn.mcstage.core.BuildInfo
 
@@ -32,6 +33,7 @@ fun main(args: Array<String>) = McstageCli()
     .versionOption(BuildInfo.version, names = setOf("--version"))
     .subcommands(
         TestCommand(),
+        ValidateCommand(),
         RunCommand(),
         CreateCommand(),
         VersionsCommand(),

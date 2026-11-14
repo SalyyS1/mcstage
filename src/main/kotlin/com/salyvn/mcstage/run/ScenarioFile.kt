@@ -27,7 +27,8 @@ object ScenarioFile {
         "steps", "timeout", "allow-prerelease",
     )
 
-    private val STEP_KEYS = setOf("expect", "send", "wait", "enabled", "timeout")
+    private val STEP_ACTIONS = setOf("expect", "send", "wait", "enabled", "file-exists", "file-contains")
+    private val STEP_KEYS = STEP_ACTIONS + setOf("timeout", "match")
 
     fun read(path: Path): Scenario {
         if (!path.exists()) throw SetupError("There is no scenario file at $path.")
@@ -47,8 +48,9 @@ object ScenarioFile {
         for (key in root.keys) {
             val name = key.toString()
             if (name !in TOP_LEVEL) {
+                val hint = closestKey(name, TOP_LEVEL)?.let { " Did you mean '$it'?" }.orEmpty()
                 throw SetupError(
-                    "$where has an unknown key '$name'. Known keys: ${TOP_LEVEL.sorted().joinToString(", ")}.",
+                    "$where has an unknown key '$name'.$hint Known keys: ${TOP_LEVEL.sorted().joinToString(", ")}.",
                 )
             }
         }
@@ -100,14 +102,24 @@ object ScenarioFile {
             val step = raw as? Map<*, *>
                 ?: throw SetupError("$at must be a mapping such as `- expect: \"Done (\"`.")
             for (key in step.keys) {
-                if (key.toString() !in STEP_KEYS) {
+                val k = key.toString()
+                if (k !in STEP_KEYS) {
+                    val hint = closestKey(k, STEP_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
                     throw SetupError(
-                        "$at has an unknown key '$key'. A step is one of: ${
-                            STEP_KEYS.minus("timeout").sorted().joinToString(", ")
+                        "$at has an unknown key '$k'.$hint A step is one of: ${
+                            STEP_ACTIONS.sorted().joinToString(", ")
                         }, with an optional timeout.",
                     )
                 }
             }
+            val presentActions = STEP_ACTIONS.filter { step.containsKey(it) }
+            if (presentActions.size > 1) {
+                throw SetupError("$at combines multiple actions (${presentActions.joinToString(", ")}); write one step per action.")
+            }
+            if (step.containsKey("match") && !step.containsKey("file-contains")) {
+                throw SetupError("$at uses 'match' without 'file-contains'.")
+            }
+
             val timeout = duration(step["timeout"], "timeout", at) ?: defaultTimeout
 
             when {
@@ -128,12 +140,37 @@ object ScenarioFile {
                         ?: throw SetupError("$at: wait needs a duration such as 5s."),
                 )
 
+                step.containsKey("file-exists") -> {
+                    val rel = InstancePaths.validateRelative(text(step["file-exists"], "file-exists", at), at)
+                    Step.FileExists(relativePath = rel, timeout = timeout)
+                }
+
+                step.containsKey("file-contains") -> parseFileContains(step, timeout, at)
+
                 else -> throw SetupError(
                     "$at does not say what to do. Use one of: ${
-                        STEP_KEYS.minus("timeout").sorted().joinToString(", ")
+                        STEP_ACTIONS.sorted().joinToString(", ")
                     }.",
                 )
             }
+        }
+    }
+
+    private fun parseFileContains(step: Map<*, *>, timeout: Duration, at: String): Step.FileContains {
+        val rawTarget = step["file-contains"]
+        return if (rawTarget is Map<*, *>) {
+            for (k in rawTarget.keys) {
+                if (k.toString() !in setOf("path", "match")) {
+                    throw SetupError("$at: file-contains mapping only accepts 'path' and 'match', got '$k'.")
+                }
+            }
+            val rel = InstancePaths.validateRelative(text(rawTarget["path"], "file-contains.path", at), at)
+            val pattern = text(rawTarget["match"] ?: step["match"], "file-contains.match", at)
+            Step.FileContains(rel, LineMatcher.parse(pattern), timeout)
+        } else {
+            val rel = InstancePaths.validateRelative(text(rawTarget, "file-contains", at), at)
+            val pattern = text(step["match"], "match", at)
+            Step.FileContains(rel, LineMatcher.parse(pattern), timeout)
         }
     }
 
@@ -179,11 +216,32 @@ object ScenarioFile {
         else -> value::class.simpleName ?: "value"
     }
 
-    /** SnakeYAML reports a position over several lines; a finding reads better on one. */
     private fun oneLine(message: String?): String =
         message?.lineSequence()
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() && !it.all { character -> character == '^' } }
             ?.joinToString(" ")
             ?: "no detail"
+
+    private fun closestKey(input: String, candidates: Set<String>): String? =
+        candidates
+            .map { it to levenshtein(input.lowercase(), it.lowercase()) }
+            .filter { (_, dist) -> dist <= 2 }
+            .minByOrNull { it.second }
+            ?.first
+
+    private fun levenshtein(a: String, b: String): Int {
+        val dp = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = dp[0]
+            dp[0] = i
+            for (j in 1..b.length) {
+                val temp = dp[j]
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                dp[j] = minOf(dp[j] + 1, dp[j - 1] + 1, prev + cost)
+                prev = temp
+            }
+        }
+        return dp[b.length]
+    }
 }
