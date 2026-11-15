@@ -65,6 +65,45 @@ sealed interface Step {
     ) : Step {
         override val describe get() = "expect file \"$relativePath\" ${matcher.describe}"
     }
+
+    /**
+     * Drives Folia multi-region synthetic lag and region merge/split barrier stress across `regions`
+     * anchor coordinates on `world` for `duration` at `cadence` intervals.
+     */
+    data class InjectLag(
+        val regions: Int = 2,
+        val mode: FoliaRegionTopology.Mode = FoliaRegionTopology.Mode.DISJOINT,
+        val world: String = "minecraft:overworld",
+        val spacingBlocks: Int = FoliaRegionTopology.DEFAULT_SPACING_BLOCKS,
+        val originX: Int = 0,
+        val originY: Int = 64,
+        val originZ: Int = 0,
+        val duration: Duration = Duration.ofSeconds(1),
+        val cadence: Duration = Duration.ofMillis(250),
+        val commands: List<String> = emptyList(),
+        val cleanup: Boolean = true,
+    ) : Step {
+        override val describe: String
+            get() = "inject ${mode.id} lag across $regions region(s) for ${Durations.format(duration)}"
+    }
+
+    /**
+     * Asserts that no Folia region merge/split barrier stall, Moonrise chunk-task deadlock, synchronous
+     * chunk load, or tick/probe latency spike exceeds `maxStall` across observed logs and `window`.
+     */
+    data class NoBarrierStall(
+        val maxStall: Duration,
+        val window: Duration,
+        val probeCommand: String? = null,
+        val probeExpect: LineMatcher? = null,
+    ) : Step {
+        override val describe: String
+            get() = if (window.isZero) {
+                "expect no chunk/region barrier stall > ${Durations.format(maxStall)}"
+            } else {
+                "expect no chunk/region barrier stall > ${Durations.format(maxStall)} for ${Durations.format(window)}"
+            }
+    }
 }
 
 /** Ensures scenario file assertions never escape the server instance directory. */

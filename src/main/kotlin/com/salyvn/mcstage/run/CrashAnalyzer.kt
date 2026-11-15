@@ -138,6 +138,24 @@ object CrashAnalyzer {
             help = "Pass --accept-eula, verify network or cache availability, and run mcstage validate before executing tests.",
             fatalForCrashGuard = false,
         ),
+        DiagnosticRule(
+            id = "MCS012",
+            name = "ChunkOrRegionBarrierStall",
+            defaultSeverity = "error",
+            shortDescription = "Folia region merge/split or Moonrise chunk barrier stall",
+            fullDescription = "The server reported a stalled ThreadedRegionizer merge/split barrier, Moonrise chunk-task scheduler deadlock, or chunk barrier timeout.",
+            help = "Eliminate synchronous getChunkAt calls and cross-region CompletableFuture.join() waits on tick threads; use getChunkAtAsync and RegionScheduler.",
+            fatalForCrashGuard = true,
+        ),
+        DiagnosticRule(
+            id = "MCS013",
+            name = "RegionTickLagSpike",
+            defaultSeverity = "warning",
+            shortDescription = "Server or Folia region tick lag spike or synchronous chunk load",
+            fullDescription = "A server or regional tick loop fell behind schedule or executed a synchronous chunk load on a tick thread.",
+            help = "Inspect Spark or JFR tick profiles, replace synchronous chunk loads with async chunk tickets, and verify threshold budgets with no-barrier-stall.",
+            fatalForCrashGuard = false,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }
@@ -189,6 +207,19 @@ object CrashAnalyzer {
                 """Could not pass event \S+ to [^\n]+|Unhandled exception executing command [^\n]+|Exception in thread "[^"]+"""",
             ),
             summary = { line -> "Unhandled server exception: ${line.trim()}" },
+        ),
+        LogSignature(
+            ruleId = "MCS012",
+            regex = BarrierStallAnalyzer.HARD_BARRIER_REGEX,
+            summary = { line -> "Chunk or region barrier stall: ${line.trim()}" },
+        ),
+        LogSignature(
+            ruleId = "MCS013",
+            regex = Regex(
+                """Can't keep up!\s*Is the server overloaded\?\s*Running\s+\d+(?:\.\d+)?ms\s+or\s+\d+\s+ticks?\s+behind|Loaded chunk\s*\(-?\d+,\s*-?\d+\)\s*synchronously|\bsync-chunk-load\b|Ticking region[^\n]*?took\s+\d+(?:\.\d+)?ms""",
+                RegexOption.IGNORE_CASE,
+            ),
+            summary = { line -> "Region tick lag spike or sync chunk load: ${line.trim()}" },
         ),
     )
 

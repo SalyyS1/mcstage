@@ -208,6 +208,96 @@ class ScenarioFileTest {
         assertTrue(badRegex.message!!.contains("invalid regular expression"), badRegex.message!!)
     }
 
+    @Test
+    fun `parses inject-lag and no-barrier-stall and enforces Folia region spacing invariants`() {
+        val scenario = write(
+            """
+            platform: folia
+            version: "26.3"
+            steps:
+              - inject-lag: 1500ms
+              - inject-lag:
+                  regions: 4
+                  mode: merge-split
+                  world: "minecraft:overworld"
+                  spacing: 1024
+                  duration: 2s
+                  cadence: 200ms
+                  command: "stress {region} {x} {z} {chunkX} {chunkZ}"
+                  cleanup: false
+              - no-barrier-stall: 400ms
+                timeout: 2s
+              - no-barrier-stall:
+                  max-stall: 350ms
+                  window: 1s
+                  probe-command: "list"
+                  probe-expect: "re:players online|issued server command"
+            """,
+        )
+        assertEquals(4, scenario.steps.size)
+        val shorthandLag = scenario.steps[0] as Step.InjectLag
+        assertEquals(2, shorthandLag.regions)
+        assertEquals(FoliaRegionTopology.Mode.DISJOINT, shorthandLag.mode)
+        assertEquals(Duration.ofMillis(1500), shorthandLag.duration)
+
+        val mergeSplitLag = scenario.steps[1] as Step.InjectLag
+        assertEquals(4, mergeSplitLag.regions)
+        assertEquals(FoliaRegionTopology.Mode.MERGE_SPLIT, mergeSplitLag.mode)
+        assertEquals(1024, mergeSplitLag.spacingBlocks)
+        assertEquals(Duration.ofSeconds(2), mergeSplitLag.duration)
+        assertEquals(Duration.ofMillis(200), mergeSplitLag.cadence)
+        assertEquals(listOf("stress {region} {x} {z} {chunkX} {chunkZ}"), mergeSplitLag.commands)
+        assertEquals(false, mergeSplitLag.cleanup)
+
+        val shortStall = scenario.steps[2] as Step.NoBarrierStall
+        assertEquals(Duration.ofMillis(400), shortStall.maxStall)
+        assertEquals(Duration.ofSeconds(2), shortStall.window)
+
+        val probedStall = scenario.steps[3] as Step.NoBarrierStall
+        assertEquals(Duration.ofMillis(350), probedStall.maxStall)
+        assertEquals("list", probedStall.probeCommand)
+
+        val tooClose = assertThrows<SetupError> {
+            write(
+                """
+                platform: folia
+                steps:
+                  - inject-lag:
+                      regions: 2
+                      spacing: 512
+                      duration: 1s
+                """,
+            )
+        }
+        assertTrue(tooClose.message!!.contains("768"), tooClose.message!!)
+
+        val singleMergeSplit = assertThrows<SetupError> {
+            write(
+                """
+                platform: folia
+                steps:
+                  - inject-lag:
+                      regions: 1
+                      mode: merge-split
+                """,
+            )
+        }
+        assertTrue(singleMergeSplit.message!!.contains("at least 2 regions"), singleMergeSplit.message!!)
+
+        val orphanProbeExpect = assertThrows<SetupError> {
+            write(
+                """
+                platform: folia
+                steps:
+                  - no-barrier-stall:
+                      max-stall: 300ms
+                      probe-expect: "pong"
+                """,
+            )
+        }
+        assertTrue(orphanProbeExpect.message!!.contains("probe-command"), orphanProbeExpect.message!!)
+    }
+
     private fun write(text: String): Scenario {
         val file = dir.resolve("scenario.yml")
         Files.writeString(file, text.trimIndent())

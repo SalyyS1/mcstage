@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.options.versionOption
+import com.salyvn.mcstage.cli.AggregateCommand
 import com.salyvn.mcstage.cli.CacheCommand
 import com.salyvn.mcstage.cli.CreateCommand
 import com.salyvn.mcstage.cli.InitCommand
@@ -18,8 +19,8 @@ import com.salyvn.mcstage.core.BuildInfo
  * Entry point.
  *
  * Everything here starts a real server: the published jar, the real plugin, the real console. Nothing is
- * mocked, because the failures worth catching before a release — a plugin that will not enable on one
- * version, a command that throws, a shutdown that hangs — are the ones a mock cannot have.
+ * mocked, because the failures worth catching before a release (a plugin that will not enable on one
+ * version, a command that throws, a shutdown that hangs) are the ones a mock cannot have.
  */
 class McstageCli : CliktCommand(name = "mcstage") {
 
@@ -34,6 +35,7 @@ fun main(args: Array<String>) = McstageCli()
     .subcommands(
         TestCommand(),
         ValidateCommand(),
+        AggregateCommand(),
         RunCommand(),
         CreateCommand(),
         VersionsCommand(),

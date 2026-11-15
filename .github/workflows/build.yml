@@ -30,14 +30,34 @@ jobs:
           java -jar "$JAR" --help
           java -jar "$JAR" test --help
           java -jar "$JAR" validate --help
+          java -jar "$JAR" aggregate --help
 
-      - name: Scenario init, offline validate, and SARIF v2.1.0 report succeed
+      - name: Scenario init, offline validate, Folia barrier steps, JUnit aggregation, and SARIF v2.1.0 succeed
         run: |
           set -euo pipefail
           JAR=$(ls build/libs/mcstage-*.jar | grep -v thin)
           java -jar "$JAR" init /tmp/generated.yml
           java -jar "$JAR" validate /tmp/generated.yml --json > /tmp/validated.json
           jq -e '.valid == true and (.cases | length >= 1) and (.crashGuard == false)' /tmp/validated.json
+          cat > /tmp/folia-barrier.yml << 'YAML'
+          name: folia barrier check
+          platforms: [paper, folia]
+          versions: ["26.3"]
+          crash-guard: true
+          steps:
+            - inject-lag:
+                regions: 3
+                mode: merge-split
+                spacing: 1024
+                duration: 1s
+                cadence: 250ms
+            - no-barrier-stall:
+                max-stall: 400ms
+                probe-command: "list"
+              timeout: 1s
+          YAML
+          java -jar "$JAR" validate /tmp/folia-barrier.yml --json > /tmp/folia-validated.json
+          jq -e '.valid == true and (.stepsCount == 2) and (.crashGuard == true)' /tmp/folia-validated.json
           set +e
           java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work --sarif /tmp/mcstage.sarif > /tmp/out.txt 2>&1
           code=$?
@@ -45,8 +65,14 @@ jobs:
           cat /tmp/out.txt
           test "$code" = "2" || { echo "expected exit code 2 for a run that could not start, got $code"; exit 1; }
           jq -e '.version == "2.1.0" and .runs[0].tool.driver.name == "mcstage"' /tmp/mcstage.sarif
-          jq -e '[.runs[0].tool.driver.rules[].id] | index("MCS001") != null and index("MCS003") != null and index("MCS011") != null' /tmp/mcstage.sarif
+          jq -e '[.runs[0].tool.driver.rules[].id] | index("MCS001") != null and index("MCS003") != null and index("MCS012") != null and index("MCS013") != null' /tmp/mcstage.sarif
           jq -e '.runs[0].results[0].ruleId == "MCS011" and .runs[0].results[0].locations[0].physicalLocation.artifactLocation.uriBaseId == "%SRCROOT%"' /tmp/mcstage.sarif
+          mkdir -p /tmp/junit-shards
+          printf '<testsuite name="shard-a" tests="1" failures="0" errors="0" time="1.500"><testcase classname="mcstage.paper" name="paper 26.3" time="1.500"/></testsuite>\n' > /tmp/junit-shards/a.xml
+          printf '<testsuites name="shard-b" tests="1" failures="0" errors="0" time="2.000"><testsuite name="shard-b" tests="1" failures="0" errors="0" time="2.000"><testcase classname="mcstage.folia" name="folia 26.3" time="2.000"/></testsuite></testsuites>\n' > /tmp/junit-shards/b.xml
+          java -jar "$JAR" aggregate /tmp/junit-shards -o /tmp/junit-shards/merged.xml --summary-markdown /tmp/junit-summary.md --fail-on-failure
+          grep -q 'tests="2"' /tmp/junit-shards/merged.xml
+          grep -q 'PASSED' /tmp/junit-summary.md
 
       - name: A mistyped scenario key is refused with a suggestion
         run: |

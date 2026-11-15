@@ -89,6 +89,24 @@ object FakeServer {
                 System.out.flush()
                 kotlin.system.exitProcess(3)
             }
+            if (command == "emit-barrier-stall") {
+                log("ERROR", "[ThreadedRegionizer] Region merge barrier stalled waiting on chunk (48, 0)")
+                continue
+            }
+            if (command.startsWith("emit-lag ")) {
+                val ms = command.removePrefix("emit-lag ").trim().toLongOrNull() ?: 1000L
+                val ticks = maxOf(1L, ms / 50L)
+                log("WARN", "Can't keep up! Is the server overloaded? Running ${ms}ms or $ticks ticks behind")
+                continue
+            }
+            if (command.startsWith("slow-cmd ")) {
+                val parts = command.removePrefix("slow-cmd ").trim().split(' ', limit = 2)
+                val delayMs = parts.getOrNull(0)?.toLongOrNull() ?: 0L
+                val reply = parts.getOrNull(1) ?: "pong"
+                if (delayMs > 0) TimeUnit.MILLISECONDS.sleep(delayMs)
+                log("INFO", reply)
+                continue
+            }
             if (command.startsWith("write ")) {
                 val rest = command.removePrefix("write ")
                 val splitAt = rest.indexOf(' ')

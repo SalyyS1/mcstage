@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.3.0 | Real-Server Plugin CI Matrix Builder & Crash Log Simulator</title>
-  <meta name="description" content="Zero-upload browser builder and validator for mcstage YAML scenarios, GitHub Actions workflows, and MCS001-MCS011 Paper/Folia/Purpur crash log SARIF v2.1.0 diagnostics." />
+  <title>mcstage v0.4.0 | Real-Server Plugin Matrix Builder, Folia Barrier &amp; JUnit Aggregator Lab</title>
+  <meta name="description" content="Zero-upload browser builder and validator for mcstage v0.4.0 YAML scenarios, Folia ThreadedRegionizer lag/barrier topology, MCS001-MCS013 SARIF v2.1.0 diagnostics, and JUnit XML report aggregation." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -64,7 +64,7 @@
       margin: 0;
       color: var(--muted);
       font-size: 14.5px;
-      max-width: 880px;
+      max-width: 920px;
     }
     .navlinks {
       display: flex;
@@ -84,6 +84,7 @@
     .tabs {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
       margin: 20px auto 0;
       max-width: 1240px;
       padding: 0 24px;
@@ -129,6 +130,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
     label {
       display: block;
@@ -137,7 +139,7 @@
       margin-bottom: 4px;
       font-weight: 600;
     }
-    input[type="text"], select, textarea {
+    input[type="text"], input[type="number"], select, textarea {
       width: 100%;
       background: #0b101b;
       color: var(--text);
@@ -148,7 +150,7 @@
       font-family: var(--mono);
     }
     textarea {
-      min-height: 220px;
+      min-height: 200px;
       resize: vertical;
     }
     .row {
@@ -190,7 +192,7 @@
     }
     .step-item {
       display: grid;
-      grid-template-columns: 135px 1fr 90px auto;
+      grid-template-columns: 150px 1fr 90px auto;
       gap: 8px;
       align-items: center;
       margin-bottom: 8px;
@@ -202,7 +204,7 @@
     .step-extra {
       grid-column: 1 / -1;
       display: grid;
-      grid-template-columns: 135px 1fr;
+      grid-template-columns: 150px 1fr;
       gap: 8px;
       align-items: center;
     }
@@ -232,6 +234,10 @@
       background: #0d1424;
       border: 1px solid var(--border);
       color: var(--accent);
+    }
+    .pill-bridge {
+      color: var(--warn);
+      border-color: rgba(245, 158, 11, 0.45);
     }
     .status-box {
       padding: 10px 12px;
@@ -281,22 +287,23 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.3.0 | Zero-Upload Browser Tool</span>
+        <span class="badge">mcstage v0.4.0 | Zero-Upload Browser Tool</span>
         <div class="navlinks">
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
           <a href="https://github.com/SalyyS1/mcstage/releases">Releases (CLI JAR)</a>
         </div>
       </div>
-      <h1>MCStage Real-Server Plugin Matrix Builder &amp; Crash Log Simulator</h1>
+      <h1>MCStage Real-Server Plugin Matrix Builder, Folia Barrier &amp; JUnit Aggregator Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios, validate instance path confinement and regex matchers offline, generate GitHub Actions + SARIF v2.1.0 workflows, and test MCS001-MCS011 crash diagnostics entirely in your browser.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with synthetic multi-region lag injection and chunk barrier stall budgets, test MCS001-MCS013 SARIF v2.1.0 diagnostics, and aggregate JUnit XML suites locally in your browser.
       </p>
     </div>
   </header>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabBuilderBtn" onclick="switchTab('builder')">1. Scenario Matrix &amp; CI Workflow Builder</button>
-    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Server Log Crash Classifier &amp; SARIF v2.1.0 Lab</button>
+    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash &amp; Barrier Classifier (MCS001-MCS013)</button>
+    <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
   </div>
 
   <main>
@@ -304,20 +311,20 @@
       <div class="card">
         <h2>
           <span>Scenario Configuration</span>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn" onclick="loadPreset('warps')">Warps Reload Preset</button>
-            <button class="btn" onclick="loadPreset('folia')">Folia Strict Guard</button>
+            <button class="btn" onclick="loadPreset('folia')">Folia Multi-Region Barrier Gate</button>
           </div>
         </h2>
 
         <div class="row">
           <div>
             <label for="scName">Scenario Name</label>
-            <input type="text" id="scName" value="warps survive a reload" oninput="renderScenario()" />
+            <input type="text" id="scName" value="warps survive Folia barrier stress" oninput="renderScenario()" />
           </div>
           <div>
             <label for="scVersions">Versions (comma-separated)</label>
-            <input type="text" id="scVersions" value="latest, 1.21.4" oninput="renderScenario()" />
+            <input type="text" id="scVersions" value="latest, 26.3, 1.21.4" oninput="renderScenario()" />
           </div>
         </div>
 
@@ -326,7 +333,7 @@
           <label><input type="checkbox" id="pfPaper" checked onchange="renderScenario()" /> paper</label>
           <label><input type="checkbox" id="pfFolia" checked onchange="renderScenario()" /> folia</label>
           <label><input type="checkbox" id="pfPurpur" checked onchange="renderScenario()" /> purpur</label>
-          <label><input type="checkbox" id="scCrashGuard" checked onchange="renderScenario()" /> crash-guard: true (MCS001-MCS006)</label>
+          <label><input type="checkbox" id="scCrashGuard" checked onchange="renderScenario()" /> crash-guard: true (MCS001-MCS006, MCS012)</label>
         </div>
 
         <div class="row">
@@ -352,7 +359,7 @@
         </div>
 
         <h2>
-          <span>Stage Assertion Steps</span>
+          <span>Stage Assertion &amp; Folia Barrier Steps</span>
           <button class="btn btn-primary" onclick="addStep()">+ Add Step</button>
         </h2>
         <div id="stepsContainer"></div>
@@ -389,6 +396,7 @@
         <h2>
           <span>Console Transcript Input (latest.log)</span>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn" onclick="loadLogSample('barrier')">Sample: Barrier Stall MCS012</button>
             <button class="btn" onclick="loadLogSample('folia')">Sample: Folia MCS003</button>
             <button class="btn" onclick="loadLogSample('linkage')">Sample: Linkage MCS002</button>
             <button class="btn" onclick="loadLogSample('watchdog')">Sample: Watchdog MCS005</button>
@@ -406,7 +414,7 @@
           </div>
           <div>
             <label for="simCaseVersion">Simulated Version</label>
-            <input type="text" id="simCaseVersion" value="1.21.4" oninput="runLogAudit()" />
+            <input type="text" id="simCaseVersion" value="26.3" oninput="runLogAudit()" />
           </div>
         </div>
         <label for="logInput">Paste server console lines or drop a latest.log file</label>
@@ -415,7 +423,7 @@
 
       <div class="card">
         <h2>
-          <span>Crash Diagnostics (MCS001-MCS011) &amp; SARIF v2.1.0</span>
+          <span>Crash &amp; Barrier Diagnostics (MCS001-MCS013) &amp; SARIF v2.1.0</span>
           <button class="btn btn-primary" onclick="downloadSarif()">Download mcstage.sarif</button>
         </h2>
         <div id="simSummary" class="status-box status-ok"></div>
@@ -424,10 +432,64 @@
         <pre id="sarifOut"></pre>
       </div>
     </section>
+
+    <section id="labSection" class="grid hidden">
+      <div class="card">
+        <h2>
+          <span>Folia ThreadedRegionizer Lattice Planner</span>
+          <span class="badge">Section = 16 chunks (256b)</span>
+        </h2>
+        <div class="row">
+          <div>
+            <label for="topRegions">Anchor Regions (1..16)</label>
+            <input type="number" id="topRegions" min="1" max="16" value="4" oninput="renderTopology()" />
+          </div>
+          <div>
+            <label for="topSpacing">Spacing Blocks (&gt;= 768 disjoint)</label>
+            <input type="number" id="topSpacing" min="256" step="256" value="768" oninput="renderTopology()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="topMode">Lag Injection Mode</label>
+            <select id="topMode" onchange="renderTopology()">
+              <option value="merge-split">merge-split (anchors + 256b bridge tickets)</option>
+              <option value="disjoint">disjoint (independent region threads)</option>
+            </select>
+          </div>
+          <div>
+            <label for="topWorld">Target Dimension</label>
+            <input type="text" id="topWorld" value="minecraft:overworld" oninput="renderTopology()" />
+          </div>
+        </div>
+        <div id="topStatus" class="status-box status-ok"></div>
+        <label>Planned Region Anchors &amp; Bridge Stepping Stones</label>
+        <div id="topPills" class="pill-list" style="margin-bottom:12px;"></div>
+        <label>Generated Pulse Console Commands</label>
+        <pre id="topCommandsOut"></pre>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>JUnit XML Matrix Report Aggregator</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn" onclick="loadSampleJunit()">Load Shards Sample</button>
+            <button class="btn btn-primary" onclick="downloadFile('merged-junit.xml', document.getElementById('aggXmlOut').textContent)">Download Merged XML</button>
+          </div>
+        </h2>
+        <label for="junitInput">Paste one or more &lt;testsuites&gt; or &lt;testsuite&gt; XML documents separated by blank lines</label>
+        <textarea id="junitInput" oninput="runJunitAggregate()" style="min-height:150px; margin-bottom:10px;"></textarea>
+        <div id="aggStatus" class="status-box status-ok"></div>
+        <label>GitHub Actions Markdown Summary (--summary-markdown)</label>
+        <pre id="aggMdOut" style="margin-bottom:12px; max-height:180px;"></pre>
+        <label>Consolidated &lt;testsuites&gt; XML</label>
+        <pre id="aggXmlOut" style="max-height:200px;"></pre>
+      </div>
+    </section>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.3.0. Runs 100% locally in your browser with zero network uploads.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.4.0. Runs 100% locally in your browser with zero network uploads.
   </footer>
 
   <script>
@@ -479,56 +541,71 @@
         shortDescription: "Unhandled exception during event dispatch or console command execution",
         help: "Inspect the stack trace in the case log tail and guard nullable or version-specific server state.",
         regex: /Could not pass event \S+ to [^\n]+|Unhandled exception executing command [^\n]+|Exception in thread "[^"]+"/
+      },
+      {
+        id: "MCS012",
+        name: "ChunkOrRegionBarrierStall",
+        severity: "error",
+        shortDescription: "Folia region merge/split or Moonrise chunk barrier stall",
+        help: "Eliminate synchronous getChunkAt calls and cross-region CompletableFuture.join() waits on tick threads.",
+        regex: /(?:ThreadedRegionizer|ChunkTaskScheduler|ChunkHolderManager|RegionizedTaskQueue|ChunkSystem)[^\n]*?\b(?:stall|stalled|deadlock|blocked|error|crash|failed|timeout)\b|(?:Chunk|Region)(?:\s+(?:merge|split))?\s+barrier\s+(?:stall|stalled|deadlock|timeout|exceeded)|Waiting on chunk\s*\(-?\d+,\s*-?\d+\)\s*on\s*(?:tick|region)\s*thread/i
+      },
+      {
+        id: "MCS013",
+        name: "RegionTickLagSpike",
+        severity: "warning",
+        shortDescription: "Server or Folia region tick lag spike or synchronous chunk load",
+        help: "Inspect Spark or JFR tick profiles, replace synchronous chunk loads with async chunk tickets, and enforce budgets with no-barrier-stall.",
+        regex: /Can't keep up!\s*Is the server overloaded\?\s*Running\s+\d+(?:\.\d+)?ms\s+or\s+\d+\s+ticks?\s+behind|Loaded chunk\s*\(-?\d+,\s*-?\d+\)\s*synchronously|\bsync-chunk-load\b|Ticking region[^\n]*?took\s+\d+(?:\.\d+)?ms/i
       }
     ];
 
     let steps = [
-      { action: "enabled", value: "Warps", timeout: "60s", match: "" },
-      { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "" },
-      { action: "send", value: "warp set spawn", timeout: "", match: "" },
-      { action: "expect", value: "set warp spawn", timeout: "", match: "" },
-      { action: "file-contains", value: "plugins/Warps/warps.yml", timeout: "5s", match: "spawn" },
-      { action: "send", value: "warp reload", timeout: "", match: "" },
-      { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "" },
-      { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "" }
+      { action: "enabled", value: "Warps", timeout: "60s", match: "", mode: "merge-split", regions: "3", spacing: "1024", probe: "" },
+      { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+      { action: "inject-lag", value: "2s", timeout: "", match: "", mode: "merge-split", regions: "3", spacing: "1024", probe: "" },
+      { action: "no-barrier-stall", value: "400ms", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "list" },
+      { action: "send", value: "warp reload", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+      { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" }
     ];
 
     function switchTab(which) {
-      const builder = which === "builder";
-      document.getElementById("builderSection").classList.toggle("hidden", !builder);
-      document.getElementById("simSection").classList.toggle("hidden", builder);
-      document.getElementById("tabBuilderBtn").classList.toggle("active", builder);
-      document.getElementById("tabSimBtn").classList.toggle("active", !builder);
+      document.getElementById("builderSection").classList.toggle("hidden", which !== "builder");
+      document.getElementById("simSection").classList.toggle("hidden", which !== "sim");
+      document.getElementById("labSection").classList.toggle("hidden", which !== "lab");
+      document.getElementById("tabBuilderBtn").classList.toggle("active", which === "builder");
+      document.getElementById("tabSimBtn").classList.toggle("active", which === "sim");
+      document.getElementById("tabLabBtn").classList.toggle("active", which === "lab");
     }
 
     function loadPreset(kind) {
       if (kind === "folia") {
-        document.getElementById("scName").value = "folia region thread safety gate";
+        document.getElementById("scName").value = "folia multi-region merge-split barrier gate";
         document.getElementById("pfPaper").checked = true;
         document.getElementById("pfFolia").checked = true;
         document.getElementById("pfPurpur").checked = false;
         document.getElementById("scVersions").value = "latest, 26.3, 1.21.4";
         document.getElementById("scCrashGuard").checked = true;
         steps = [
-          { action: "enabled", value: "RegionPlugin", timeout: "60s", match: "" },
-          { action: "send", value: "region benchmark 50", timeout: "", match: "" },
-          { action: "expect", value: "benchmark completed", timeout: "15s", match: "" },
-          { action: "not-expect", value: "re:Thread failed main thread check|TickThread", timeout: "3s", match: "" },
-          { action: "file-not-exists", value: "crash-reports/latest.txt", timeout: "", match: "" }
+          { action: "enabled", value: "RegionPlugin", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "inject-lag", value: "2s", timeout: "", match: "", mode: "merge-split", regions: "4", spacing: "1024", probe: "" },
+          { action: "no-barrier-stall", value: "350ms", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "list" },
+          { action: "not-expect", value: "re:Thread failed main thread check|TickThread", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "file-not-exists", value: "crash-reports/latest.txt", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" }
         ];
       } else {
         document.getElementById("scName").value = "warps survive a reload";
         document.getElementById("pfPaper").checked = true;
         document.getElementById("pfFolia").checked = true;
         document.getElementById("pfPurpur").checked = true;
-        document.getElementById("scVersions").value = "latest, 1.21.4";
+        document.getElementById("scVersions").value = "latest, 26.3, 1.21.4";
         document.getElementById("scCrashGuard").checked = true;
         steps = [
-          { action: "enabled", value: "Warps", timeout: "60s", match: "" },
-          { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "" },
-          { action: "send", value: "warp reload", timeout: "", match: "" },
-          { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "" },
-          { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "" }
+          { action: "enabled", value: "Warps", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "send", value: "warp reload", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
+          { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" }
         ];
       }
       renderStepsEditor();
@@ -536,7 +613,7 @@
     }
 
     function addStep() {
-      steps.push({ action: "expect", value: "Done", timeout: "", match: "" });
+      steps.push({ action: "no-barrier-stall", value: "400ms", timeout: "1s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" });
       renderStepsEditor();
       renderScenario();
     }
@@ -556,12 +633,43 @@
     function renderStepsEditor() {
       const box = document.getElementById("stepsContainer");
       box.innerHTML = "";
+      const actions = [
+        "enabled", "send", "expect", "not-expect",
+        "file-exists", "file-not-exists", "file-contains",
+        "inject-lag", "no-barrier-stall", "wait"
+      ];
       steps.forEach((st, idx) => {
         const div = document.createElement("div");
         div.className = "step-item";
-        const actions = ["enabled", "send", "expect", "not-expect", "file-exists", "file-not-exists", "file-contains", "wait"];
         const options = actions.map(a => `<option value="${a}" ${st.action === a ? "selected" : ""}>${a}</option>`).join("");
-        const showTimeout = st.action !== "send" && st.action !== "wait";
+        const showTimeout = st.action !== "send" && st.action !== "wait" && st.action !== "inject-lag";
+        let extras = "";
+        if (st.action === "file-contains") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">match pattern:</span>
+              <input type="text" value="${escapeHtmlAttr(st.match || '')}" placeholder="substring or re:pattern" oninput="updateStep(${idx}, 'match', this.value)" />
+            </div>`;
+        } else if (st.action === "inject-lag") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">mode / regions / spacing:</span>
+              <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:6px;">
+                <select onchange="updateStep(${idx}, 'mode', this.value)">
+                  <option value="disjoint" ${st.mode === "disjoint" ? "selected" : ""}>disjoint</option>
+                  <option value="merge-split" ${st.mode === "merge-split" ? "selected" : ""}>merge-split</option>
+                </select>
+                <input type="number" value="${escapeHtmlAttr(st.regions || '2')}" min="1" max="64" title="regions" oninput="updateStep(${idx}, 'regions', this.value)" />
+                <input type="number" value="${escapeHtmlAttr(st.spacing || '1024')}" step="256" title="spacing blocks" oninput="updateStep(${idx}, 'spacing', this.value)" />
+              </div>
+            </div>`;
+        } else if (st.action === "no-barrier-stall") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">probe-command (optional):</span>
+              <input type="text" value="${escapeHtmlAttr(st.probe || '')}" placeholder="e.g. list (leave blank for passive log audit)" oninput="updateStep(${idx}, 'probe', this.value)" />
+            </div>`;
+        }
         div.innerHTML = `
           <select onchange="updateStep(${idx}, 'action', this.value)">${options}</select>
           <input type="text" value="${escapeHtmlAttr(st.value)}" placeholder="${placeholderFor(st.action)}" oninput="updateStep(${idx}, 'value', this.value)" />
@@ -569,12 +677,7 @@
             ? `<input type="text" value="${escapeHtmlAttr(st.timeout)}" placeholder="timeout" oninput="updateStep(${idx}, 'timeout', this.value)" />`
             : `<span style="font-size:11.5px;color:var(--muted);text-align:center;">-</span>`}
           <button class="btn" onclick="removeStep(${idx})">Remove</button>
-          ${st.action === "file-contains" ? `
-            <div class="step-extra">
-              <span style="font-size:12px;color:var(--muted);text-align:right;">match pattern:</span>
-              <input type="text" value="${escapeHtmlAttr(st.match)}" placeholder="substring or re:pattern" oninput="updateStep(${idx}, 'match', this.value)" />
-            </div>
-          ` : ""}
+          ${extras}
         `;
         box.appendChild(div);
       });
@@ -583,7 +686,8 @@
     function placeholderFor(action) {
       if (action === "enabled") return "PluginName";
       if (action === "send") return "console command";
-      if (action === "wait") return "5s";
+      if (action === "wait" || action === "inject-lag") return "duration (e.g. 2s)";
+      if (action === "no-barrier-stall") return "max-stall (e.g. 400ms)";
       if (action.startsWith("file-")) return "plugins/MyPlugin/config.yml";
       return "substring or re:pattern";
     }
@@ -591,7 +695,7 @@
     function validateDuration(raw, label, errors) {
       if (!raw) return;
       if (!/^\d+(\.\d+)?(ms|s|m|h)?$/.test(raw.trim())) {
-        errors.push(`${label}: '${raw}' is not a valid duration (use e.g. 500ms, 5s, 2m).`);
+        errors.push(`${label}: '${raw}' is not a valid duration (use e.g. 400ms, 2s, 1m).`);
       }
     }
 
@@ -642,7 +746,7 @@
       if (platforms.length === 0) errors.push("Select at least one platform (paper, folia, or purpur).");
 
       const versions = document.getElementById("scVersions").value.split(",").map(s => s.trim()).filter(Boolean);
-      if (versions.length === 0) errors.push("Specify at least one Minecraft version (e.g. latest, 1.21.4).");
+      if (versions.length === 0) errors.push("Specify at least one Minecraft version (e.g. latest, 26.3, 1.21.4).");
 
       const memory = document.getElementById("scMemory").value.trim() || "2G";
       const timeout = document.getElementById("scTimeout").value.trim() || "20s";
@@ -658,10 +762,25 @@
       steps.forEach((st, i) => {
         const at = `steps[${i}] (${st.action})`;
         if (st.timeout) validateDuration(st.timeout, `${at}.timeout`, errors);
-        if (st.action === "wait") validateDuration(st.value, at, errors);
-        else if (st.action === "expect" || st.action === "not-expect") validateMatcher(st.value, at, errors);
-        else if (st.action === "file-exists" || st.action === "file-not-exists") validateRelativePath(st.value, at, errors);
-        else if (st.action === "file-contains") {
+        if (st.action === "wait") {
+          if (!st.value.trim()) errors.push(`${at}: duration required.`);
+          validateDuration(st.value, at, errors);
+        } else if (st.action === "inject-lag") {
+          if (!st.value.trim()) errors.push(`${at}: duration required.`);
+          validateDuration(st.value, `${at}.duration`, errors);
+          const regs = parseInt(st.regions || "2", 10);
+          const sp = parseInt(st.spacing || "1024", 10);
+          if (isNaN(regs) || regs < 1 || regs > 64) errors.push(`${at}: regions must be 1..64.`);
+          if (st.mode === "merge-split" && regs < 2) errors.push(`${at}: merge-split requires at least 2 regions.`);
+          if (isNaN(sp) || sp < 768) errors.push(`${at}: spacing must be >= 768 blocks (3 Folia 16-chunk sections).`);
+        } else if (st.action === "no-barrier-stall") {
+          if (!st.value.trim()) errors.push(`${at}: max-stall duration required.`);
+          validateDuration(st.value, `${at}.max-stall`, errors);
+        } else if (st.action === "expect" || st.action === "not-expect") {
+          validateMatcher(st.value, at, errors);
+        } else if (st.action === "file-exists" || st.action === "file-not-exists") {
+          validateRelativePath(st.value, at, errors);
+        } else if (st.action === "file-contains") {
           validateRelativePath(st.value, `${at}.path`, errors);
           validateMatcher(st.match, `${at}.match`, errors);
         } else if (!st.value.trim()) {
@@ -708,12 +827,26 @@
       lines.push("");
       lines.push("steps:");
       steps.forEach(st => {
-        lines.push(`  - ${st.action}: ${yamlQuote(st.value)}`);
-        if (st.action === "file-contains") {
-          lines.push(`    match: ${yamlQuote(st.match)}`);
-        }
-        if (st.timeout && st.action !== "send" && st.action !== "wait") {
-          lines.push(`    timeout: ${st.timeout}`);
+        if (st.action === "inject-lag") {
+          lines.push("  - inject-lag:");
+          lines.push(`      regions: ${parseInt(st.regions || "2", 10)}`);
+          lines.push(`      mode: ${st.mode || "disjoint"}`);
+          lines.push(`      spacing: ${parseInt(st.spacing || "1024", 10)}`);
+          lines.push(`      duration: ${st.value.trim()}`);
+          lines.push("      cadence: 250ms");
+        } else if (st.action === "no-barrier-stall" && (st.probe || "").trim()) {
+          lines.push("  - no-barrier-stall:");
+          lines.push(`      max-stall: ${st.value.trim()}`);
+          lines.push(`      probe-command: ${JSON.stringify(st.probe.trim())}`);
+          if (st.timeout) lines.push(`    timeout: ${st.timeout}`);
+        } else {
+          lines.push(`  - ${st.action}: ${yamlQuote(st.value)}`);
+          if (st.action === "file-contains") {
+            lines.push(`    match: ${yamlQuote(st.match)}`);
+          }
+          if (st.timeout && st.action !== "send" && st.action !== "wait") {
+            lines.push(`    timeout: ${st.timeout}`);
+          }
         }
       });
 
@@ -739,12 +872,13 @@
         "      - run: ./gradlew build --no-daemon",
         "",
         "      - name: Run Real-Server Matrix",
-        "        uses: SalyyS1/mcstage@v0.3.0",
+        "        uses: SalyyS1/mcstage@v0.4.0",
         "        with:",
         "          scenario: mcstage.yml",
         "          accept-eula: 'true'",
         "          format: junit",
         "          output: build/test-results/mcstage.xml",
+        "          summary-markdown: ${{ env.GITHUB_STEP_SUMMARY }}",
         "          sarif: build/reports/mcstage.sarif",
         "",
         "      - name: Upload SARIF Diagnostics",
@@ -758,6 +892,15 @@
 
     function loadLogSample(kind) {
       const samples = {
+        barrier: [
+          "[03:11:00 INFO]: Starting minecraft server version 26.3",
+          "[03:11:03 INFO]: Done (2.940s)! For help, type \"help\"",
+          "[03:11:03 INFO]: [Warps] Enabling Warps v1.5.0",
+          "[03:11:04 WARN]: Loaded chunk (-12, 48) synchronously on region thread #3",
+          "[03:11:05 WARN]: Can't keep up! Is the server overloaded? Running 640ms or 12 ticks behind",
+          "[03:11:06 ERROR]: [ThreadedRegionizer] Region merge barrier stalled waiting on chunk (48, 0)",
+          "[03:11:07 INFO]: Stopping server"
+        ].join("\n"),
         folia: [
           "[03:14:01 INFO]: Starting minecraft server version 1.21.4",
           "[03:14:03 INFO]: [Warps] Loading server plugin Warps v1.4.0",
@@ -786,7 +929,7 @@
           "[03:18:46 ERROR]: This crash report has been saved to: /srv/.mcstage/paper-1.21.4/crash-reports/crash-2026-11-15_03.18.46-server.txt"
         ].join("\n"),
         clean: [
-          "[03:20:00 INFO]: Starting minecraft server version 1.21.4",
+          "[03:20:00 INFO]: Starting minecraft server version 26.3",
           "[03:20:03 INFO]: Done (3.015s)! For help, type \"help\"",
           "[03:20:03 INFO]: [Warps] Enabling Warps v1.4.0",
           "[03:20:04 INFO]: issued server command: /warp reload",
@@ -794,14 +937,14 @@
           "[03:20:05 INFO]: Stopping server"
         ].join("\n")
       };
-      document.getElementById("logInput").value = samples[kind] || samples.folia;
+      document.getElementById("logInput").value = samples[kind] || samples.barrier;
       runLogAudit();
     }
 
     function runLogAudit() {
       const text = document.getElementById("logInput").value || "";
       const platform = document.getElementById("simCasePlatform").value;
-      const version = document.getElementById("simCaseVersion").value.trim() || "1.21.4";
+      const version = document.getElementById("simCaseVersion").value.trim() || "26.3";
       const caseLabel = `${platform} ${version}`;
       const lines = text.split(/\r?\n/);
       const findings = [];
@@ -829,10 +972,10 @@
       const summary = document.getElementById("simSummary");
       if (findings.length === 0) {
         summary.className = "status-box status-ok";
-        summary.textContent = `PASS (${caseLabel}): 0 crash or thread-safety signatures across ${lines.length} log line(s)`;
+        summary.textContent = `PASS (${caseLabel}): 0 crash or barrier-stall signatures across ${lines.length} log line(s)`;
       } else {
         summary.className = "status-box status-err";
-        summary.textContent = `CRASH-GUARD TRIGGERED (${caseLabel}): ${findings.length} diagnostic finding(s) [${[...new Set(findings.map(f => f.ruleId))].join(", ")}]`;
+        summary.textContent = `DIAGNOSTICS TRIGGERED (${caseLabel}): ${findings.length} finding(s) [${[...new Set(findings.map(f => f.ruleId))].join(", ")}]`;
       }
 
       const list = document.getElementById("findingsList");
@@ -855,7 +998,7 @@
             "tool": {
               "driver": {
                 "name": "mcstage",
-                "version": "0.3.0",
+                "version": "0.4.0",
                 "informationUri": "https://github.com/SalyyS1/mcstage",
                 "rules": RULES.map(r => ({
                   "id": r.id,
@@ -898,6 +1041,206 @@
       document.getElementById("sarifOut").textContent = JSON.stringify(sarif, null, 2);
     }
 
+    function renderTopology() {
+      const regions = Math.min(16, Math.max(1, parseInt(document.getElementById("topRegions").value || "4", 10)));
+      const spacing = Math.max(256, parseInt(document.getElementById("topSpacing").value || "768", 10));
+      const mode = document.getElementById("topMode").value;
+      const world = document.getElementById("topWorld").value.trim() || "minecraft:overworld";
+
+      const cols = Math.max(1, Math.ceil(Math.sqrt(regions)));
+      const nodes = [];
+      for (let i = 0; i < regions; i++) {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const x = col * spacing;
+        const z = row * spacing;
+        const cx = Math.floor(x / 16);
+        const cz = Math.floor(z / 16);
+        nodes.push({ index: i, row, col, x, z, cx, cz, sx: Math.floor(cx / 16), sz: Math.floor(cz / 16) });
+      }
+
+      let minDist = Infinity;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const d = Math.max(Math.abs(nodes[i].sx - nodes[j].sx), Math.abs(nodes[i].sz - nodes[j].sz));
+          if (d < minDist) minDist = d;
+        }
+      }
+
+      const byGrid = {};
+      nodes.forEach(n => { byGrid[`${n.row},${n.col}`] = n; });
+      const seenSec = new Set(nodes.map(n => `${n.sx},${n.sz}`));
+      const bridges = [];
+      if (mode === "merge-split" && nodes.length >= 2) {
+        nodes.forEach(n => {
+          const nb = n.col > 0 ? byGrid[`${n.row},${n.col - 1}`] : (n.row > 0 ? byGrid[`${n.row - 1},0`] : null);
+          if (!nb) return;
+          const dx = n.x - nb.x;
+          const dz = n.z - nb.z;
+          const stepsCount = Math.floor(Math.max(Math.abs(dx), Math.abs(dz)) / 256);
+          const stepX = Math.sign(dx) * 256;
+          const stepZ = Math.sign(dz) * 256;
+          for (let s = 1; s < stepsCount; s++) {
+            const bx = nb.x + stepX * s;
+            const bz = nb.z + stepZ * s;
+            const sx = Math.floor(Math.floor(bx / 16) / 16);
+            const sz = Math.floor(Math.floor(bz / 16) / 16);
+            const key = `${sx},${sz}`;
+            if (!seenSec.has(key)) {
+              seenSec.add(key);
+              bridges.push({ x: bx, z: bz, sx, sz });
+            }
+          }
+        });
+      }
+
+      const status = document.getElementById("topStatus");
+      if (spacing < 768) {
+        status.className = "status-box status-err";
+        status.textContent = `WARNING: spacing=${spacing}b gives Chebyshev section distance ${isFinite(minDist) ? minDist : 0} (< 3). Folia ThreadedRegionizer will auto-merge anchors! Use >= 768.`;
+      } else {
+        status.className = "status-box status-ok";
+        status.textContent = `DISJOINT ANCHORS VERIFIED: ${nodes.length} region(s), min Chebyshev section distance = ${isFinite(minDist) ? minDist : 'N/A'} (>= 3), ${bridges.length} bridge ticket(s)`;
+      }
+
+      const pills = document.getElementById("topPills");
+      pills.innerHTML = nodes.map(n => `<span class="pill">R${n.index} (${n.x}, ${n.z}) sec[${n.sx},${n.sz}]</span>`).join("") +
+        bridges.map((b, i) => `<span class="pill pill-bridge">Bridge#${i} (${b.x}, ${b.z}) sec[${b.sx},${b.sz}]</span>`).join("");
+
+      const cmds = [];
+      cmds.push("# Anchor setup");
+      nodes.forEach(n => cmds.push(`execute in ${world} run forceload add ${n.x} ${n.z}`));
+      cmds.push("\n# Pulse 0 (even pulse)");
+      nodes.forEach(n => cmds.push(`execute in ${world} run forceload query ${n.x} ${n.z}`));
+      if (mode === "merge-split" && bridges.length > 0) {
+        bridges.forEach(b => cmds.push(`execute in ${world} run forceload add ${b.x} ${b.z}`));
+        cmds.push("\n# Pulse 1 (odd pulse - region split)");
+        nodes.forEach(n => cmds.push(`execute in ${world} run forceload query ${n.x} ${n.z}`));
+        bridges.forEach(b => cmds.push(`execute in ${world} run forceload remove ${b.x} ${b.z}`));
+      }
+      document.getElementById("topCommandsOut").textContent = cmds.join("\n");
+    }
+
+    function loadSampleJunit() {
+      document.getElementById("junitInput").value = [
+        `<testsuites name="warps-paper" tests="2" failures="0" errors="0" time="3.820">`,
+        `  <testsuite name="warps-paper" tests="2" failures="0" errors="0" time="3.820">`,
+        `    <testcase classname="mcstage.paper" name="paper 1.21.4" time="1.800"/>`,
+        `    <testcase classname="mcstage.paper" name="paper 26.3" time="2.020"/>`,
+        `  </testsuite>`,
+        `</testsuites>`,
+        ``,
+        `<testsuite name="warps-folia" tests="2" failures="1" errors="0" skipped="0" time="5.410">`,
+        `  <testcase classname="mcstage.folia" name="folia 1.21.4" time="2.210"/>`,
+        `  <testcase classname="mcstage.folia" name="folia 26.3" time="3.200">`,
+        `    <failure message="MCS012 barrier stall > 350ms" type="ScenarioFailure">Region merge barrier stalled</failure>`,
+        `  </testcase>`,
+        `</testsuite>`
+      ].join("\n");
+      runJunitAggregate();
+    }
+
+    function runJunitAggregate() {
+      const raw = (document.getElementById("junitInput").value || "").trim();
+      const aggStatus = document.getElementById("aggStatus");
+      if (!raw) {
+        aggStatus.className = "status-box status-err";
+        aggStatus.textContent = "Paste at least one JUnit XML document.";
+        return;
+      }
+      const wrapped = `<root>${raw.replace(/<\?xml[^>]*\?>/g, "")}</root>`;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(wrapped, "application/xml");
+      const parseErr = doc.querySelector("parsererror");
+      if (parseErr) {
+        aggStatus.className = "status-box status-err";
+        aggStatus.textContent = "XML Parse Error: " + parseErr.textContent.split("\n")[0];
+        return;
+      }
+
+      const suites = [];
+      function collectSuite(el) {
+        const directCases = Array.from(el.children).filter(c => c.tagName === "testcase");
+        const nested = Array.from(el.children).filter(c => c.tagName === "testsuite");
+        if (directCases.length > 0 || nested.length === 0) {
+          const sName = el.getAttribute("name") || "suite";
+          const cases = directCases.map(tc => {
+            const fail = Array.from(tc.children).find(c => c.tagName === "failure");
+            const err = Array.from(tc.children).find(c => c.tagName === "error");
+            const skip = Array.from(tc.children).find(c => c.tagName === "skipped");
+            let st = "PASSED", msg = "";
+            if (err) { st = "ERRORED"; msg = err.getAttribute("message") || "Error"; }
+            else if (fail) { st = "FAILED"; msg = fail.getAttribute("message") || "Failure"; }
+            else if (skip) { st = "SKIPPED"; msg = skip.getAttribute("message") || ""; }
+            return {
+              className: tc.getAttribute("classname") || sName,
+              name: tc.getAttribute("name") || "case",
+              time: parseFloat(tc.getAttribute("time") || "0") || 0,
+              status: st,
+              msg,
+              outerXml: tc.outerHTML
+            };
+          });
+          const declaredTime = parseFloat(el.getAttribute("time") || "NaN");
+          const time = isNaN(declaredTime) ? cases.reduce((a, b) => a + b.time, 0) : declaredTime;
+          suites.push({
+            name: sName,
+            cases,
+            tests: cases.length,
+            passed: cases.filter(c => c.status === "PASSED").length,
+            failures: cases.filter(c => c.status === "FAILED").length,
+            errors: cases.filter(c => c.status === "ERRORED").length,
+            skipped: cases.filter(c => c.status === "SKIPPED").length,
+            time
+          });
+        }
+        nested.forEach(collectSuite);
+      }
+
+      Array.from(doc.documentElement.children).forEach(ch => {
+        if (ch.tagName === "testsuite") collectSuite(ch);
+        else if (ch.tagName === "testsuites") {
+          Array.from(ch.children).filter(x => x.tagName === "testsuite").forEach(collectSuite);
+        }
+      });
+
+      const totTests = suites.reduce((a, s) => a + s.tests, 0);
+      const totPass = suites.reduce((a, s) => a + s.passed, 0);
+      const totFail = suites.reduce((a, s) => a + s.failures, 0);
+      const totErr = suites.reduce((a, s) => a + s.errors, 0);
+      const totSkip = suites.reduce((a, s) => a + s.skipped, 0);
+      const totTime = suites.reduce((a, s) => a + s.time, 0);
+      const ok = totFail === 0 && totErr === 0;
+
+      aggStatus.className = ok ? "status-box status-ok" : "status-box status-err";
+      aggStatus.textContent = `${ok ? "PASSED" : "FAILED"}: ${totTests} test(s) across ${suites.length} suite(s) (${totPass} passed, ${totFail} failed, ${totErr} errors, ${totSkip} skipped) in ${totTime.toFixed(3)}s`;
+
+      const md = [];
+      md.push(`## JUnit Matrix Summary: mcstage-matrix (${ok ? "PASSED" : "FAILED"})`);
+      md.push("");
+      md.push(`- **Total cases:** ${totTests} (${totPass} passed, ${totFail} failed, ${totErr} errors, ${totSkip} skipped) in ${totTime.toFixed(3)}s`);
+      md.push("");
+      md.push("| Suite | Tests | Passed | Failed | Errors | Skipped | Time |");
+      md.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+      suites.forEach(s => {
+        md.push(`| ${s.name} | ${s.tests} | ${s.passed} | ${s.failures} | ${s.errors} | ${s.skipped} | ${s.time.toFixed(3)}s |`);
+      });
+      document.getElementById("aggMdOut").textContent = md.join("\n");
+
+      const xml = [];
+      xml.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+      xml.push(`<testsuites name="mcstage-matrix" tests="${totTests}" failures="${totFail}" errors="${totErr}" skipped="${totSkip}" time="${totTime.toFixed(3)}">`);
+      suites.forEach(s => {
+        xml.push(`  <testsuite name="${escapeHtmlAttr(s.name)}" tests="${s.tests}" failures="${s.failures}" errors="${s.errors}" skipped="${s.skipped}" time="${s.time.toFixed(3)}">`);
+        s.cases.forEach(c => {
+          xml.push("    " + c.outerXml);
+        });
+        xml.push(`  </testsuite>`);
+      });
+      xml.push(`</testsuites>`);
+      document.getElementById("aggXmlOut").textContent = xml.join("\n");
+    }
+
     function copyText(id) {
       const txt = document.getElementById(id).textContent;
       navigator.clipboard.writeText(txt);
@@ -926,7 +1269,9 @@
 
     renderStepsEditor();
     renderScenario();
-    loadLogSample("folia");
+    loadLogSample("barrier");
+    renderTopology();
+    loadSampleJunit();
   </script>
 </body>
 </html>

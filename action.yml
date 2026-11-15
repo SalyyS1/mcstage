@@ -30,10 +30,14 @@ inputs:
     description: 'Optional file path to write an OASIS SARIF v2.1.0 report alongside the primary format'
     required: false
     default: ''
+  summary-markdown:
+    description: 'Optional path to write a GitHub Flavored Markdown JUnit test summary (when format=junit and output is set)'
+    required: false
+    default: ''
   version:
     description: 'MCStage release tag to download'
     required: false
-    default: 'v0.3.0'
+    default: 'v0.4.0'
 
 outputs:
   sarif-file:
@@ -78,6 +82,7 @@ runs:
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_OUTPUT: ${{ inputs.output }}
         INPUT_SARIF: ${{ inputs.sarif }}
+        INPUT_SUMMARY_MD: ${{ inputs.summary-markdown }}
       run: |
         set -euo pipefail
         ARGS=("test" "${INPUT_SCENARIO}" "--format" "${INPUT_FORMAT}")
@@ -96,4 +101,11 @@ runs:
         elif [ "${INPUT_FORMAT}" = "sarif" ] && [ -n "${INPUT_OUTPUT}" ]; then
           echo "sarif-file=${INPUT_OUTPUT}" >> "${GITHUB_OUTPUT}"
         fi
+        set +e
         java -jar "${RUNNER_TEMP}/mcstage/mcstage.jar" "${ARGS[@]}"
+        RC=$?
+        set -e
+        if [ -n "${INPUT_SUMMARY_MD}" ] && [ "${INPUT_FORMAT}" = "junit" ] && [ -n "${INPUT_OUTPUT}" ] && [ -f "${INPUT_OUTPUT}" ]; then
+          java -jar "${RUNNER_TEMP}/mcstage/mcstage.jar" aggregate "${INPUT_OUTPUT}" --format markdown -o "${INPUT_SUMMARY_MD}"
+        fi
+        exit "${RC}"

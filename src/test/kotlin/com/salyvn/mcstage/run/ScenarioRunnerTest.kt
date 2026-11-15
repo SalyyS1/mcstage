@@ -188,6 +188,79 @@ class ScenarioRunnerTest {
         assertEquals("crash-reports/crash-2026-11-15_03.30.00-server.txt", crashDiag.artifactPath)
     }
 
+    @Test
+    fun `inject-lag dispatches multi-region merge-split pulses and passes no-barrier-stall within budget`() {
+        val report = run(
+            scenario(
+                Step.InjectLag(
+                    regions = 3,
+                    mode = FoliaRegionTopology.Mode.MERGE_SPLIT,
+                    spacingBlocks = 768,
+                    duration = Duration.ofMillis(260),
+                    cadence = Duration.ofMillis(100),
+                    commands = listOf("region-work r={region} x={x} z={z} p={pulse}"),
+                    cleanup = false,
+                ),
+                Step.Send("emit-lag 120"),
+                Step.NoBarrierStall(
+                    maxStall = Duration.ofMillis(500),
+                    window = Duration.ofMillis(150),
+                    probeCommand = "slow-cmd 20 barrier-ok",
+                    probeExpect = LineMatcher.parse("re:\\]: barrier-ok$"),
+                ),
+            ),
+        )
+        val case = report.cases.single()
+        assertEquals(Outcome.PASSED, case.outcome, "failure was ${case.failure}")
+        assertEquals(4, case.steps.size)
+        assertTrue(case.steps[1].matched!!.contains("3 region anchor(s)"), case.steps[1].matched!!)
+        assertTrue(case.steps[3].matched!!.contains("probe RTT"), case.steps[3].matched!!)
+        // 120ms lag is recorded as an informational MCS013 warning, while <= 500ms budget passes.
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS013" })
+    }
+
+    @Test
+    fun `no-barrier-stall catches barrier stall emitted during preceding inject-lag step`() {
+        val report = run(
+            scenario(
+                Step.InjectLag(
+                    regions = 2,
+                    mode = FoliaRegionTopology.Mode.DISJOINT,
+                    duration = Duration.ofMillis(120),
+                    cadence = Duration.ofMillis(80),
+                    commands = listOf("emit-barrier-stall"),
+                    cleanup = false,
+                ),
+                Step.NoBarrierStall(
+                    maxStall = Duration.ofMillis(300),
+                    window = Duration.ofMillis(100),
+                ),
+            ),
+        )
+        val case = report.cases.single()
+        assertEquals(Outcome.FAILED, case.outcome)
+        assertTrue(case.failure!!.contains("ThreadedRegionizer"), case.failure)
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS012" }, case.diagnostics.toString())
+    }
+
+    @Test
+    fun `no-barrier-stall fails when active console barrier probe exceeds max-stall budget`() {
+        val report = run(
+            scenario(
+                Step.NoBarrierStall(
+                    maxStall = Duration.ofMillis(120),
+                    window = Duration.ofMillis(50),
+                    probeCommand = "slow-cmd 340 delayed-pong",
+                    probeExpect = LineMatcher.parse("re:\\]: delayed-pong$"),
+                ),
+            ),
+        )
+        val case = report.cases.single()
+        assertEquals(Outcome.FAILED, case.outcome)
+        assertTrue(case.failure!!.contains("exceeding max-stall 120ms"), case.failure)
+        assertTrue(case.diagnostics.any { it.ruleId == "MCS012" }, case.diagnostics.toString())
+    }
+
     private fun run(scenario: Scenario, vararg flags: String): RunReport =
         ScenarioRunner(
             preparer = ExistingPreparer(instance()),
