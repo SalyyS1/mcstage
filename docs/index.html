@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.4.0 | Real-Server Plugin Matrix Builder, Folia Barrier &amp; JUnit Aggregator Lab</title>
-  <meta name="description" content="Zero-upload browser builder and validator for mcstage v0.4.0 YAML scenarios, Folia ThreadedRegionizer lag/barrier topology, MCS001-MCS013 SARIF v2.1.0 diagnostics, and JUnit XML report aggregation." />
+  <title>mcstage v0.5.0 | Real-Server Plugin Matrix Builder, Heap Assertion, Folia Barrier &amp; JUnit Aggregator Lab</title>
+  <meta name="description" content="Zero-upload browser builder and validator for mcstage v0.5.0 YAML scenarios: assert-heap JVM heap assertions, extends inheritance, Folia barrier topology, MCS001-MCS014 SARIF v2.1.0 diagnostics, and JUnit XML aggregation." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -287,7 +287,7 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.4.0 | Zero-Upload Browser Tool</span>
+        <span class="badge">mcstage v0.5.0 | Zero-Upload Browser Tool</span>
         <div class="navlinks">
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
           <a href="https://github.com/SalyyS1/mcstage/releases">Releases (CLI JAR)</a>
@@ -295,14 +295,14 @@
       </div>
       <h1>MCStage Real-Server Plugin Matrix Builder, Folia Barrier &amp; JUnit Aggregator Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios with synthetic multi-region lag injection and chunk barrier stall budgets, test MCS001-MCS013 SARIF v2.1.0 diagnostics, and aggregate JUnit XML suites locally in your browser.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with assert-heap JVM heap assertions, extends scenario inheritance, inject-lag and no-barrier-stall budgets, test MCS001-MCS014 SARIF v2.1.0 diagnostics, and aggregate JUnit XML suites locally in your browser.
       </p>
     </div>
   </header>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabBuilderBtn" onclick="switchTab('builder')">1. Scenario Matrix &amp; CI Workflow Builder</button>
-    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash &amp; Barrier Classifier (MCS001-MCS013)</button>
+    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash &amp; Barrier Classifier (MCS001-MCS014)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
   </div>
 
@@ -423,7 +423,7 @@
 
       <div class="card">
         <h2>
-          <span>Crash &amp; Barrier Diagnostics (MCS001-MCS013) &amp; SARIF v2.1.0</span>
+          <span>Crash &amp; Barrier Diagnostics (MCS001-MCS014) &amp; SARIF v2.1.0</span>
           <button class="btn btn-primary" onclick="downloadSarif()">Download mcstage.sarif</button>
         </h2>
         <div id="simSummary" class="status-box status-ok"></div>
@@ -489,7 +489,7 @@
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.4.0. Runs 100% locally in your browser with zero network uploads.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.5.0. Runs 100% locally in your browser with zero network uploads.
   </footer>
 
   <script>
@@ -636,7 +636,7 @@
       const actions = [
         "enabled", "send", "expect", "not-expect",
         "file-exists", "file-not-exists", "file-contains",
-        "inject-lag", "no-barrier-stall", "wait"
+        "assert-heap", "inject-lag", "no-barrier-stall", "wait"
       ];
       steps.forEach((st, idx) => {
         const div = document.createElement("div");
@@ -650,7 +650,9 @@
               <span style="font-size:12px;color:var(--muted);text-align:right;">match pattern:</span>
               <input type="text" value="${escapeHtmlAttr(st.match || '')}" placeholder="substring or re:pattern" oninput="updateStep(${idx}, 'match', this.value)" />
             </div>`;
-        } else if (st.action === "inject-lag") {
+        } else if (st.action === "assert-heap") {
+        line = `  - assert-heap:\n      max-percent: ${st.heapPct||80}\n      window: ${st.timeout||"30s"}`;
+      } else if (st.action === "inject-lag") {
           extras = `
             <div class="step-extra">
               <span style="font-size:12px;color:var(--muted);text-align:right;">mode / regions / spacing:</span>
@@ -663,6 +665,8 @@
                 <input type="number" value="${escapeHtmlAttr(st.spacing || '1024')}" step="256" title="spacing blocks" oninput="updateStep(${idx}, 'spacing', this.value)" />
               </div>
             </div>`;
+        } else if (st.action === "assert-heap") {
+          extra = `<label>max-percent <input type="number" min="0" max="100" value="${st.heapPct||80}" style="width:60px" onchange="updateStep(${idx},'heapPct',+this.value)" /></label>`;
         } else if (st.action === "no-barrier-stall") {
           extras = `
             <div class="step-extra">
@@ -765,7 +769,9 @@
         if (st.action === "wait") {
           if (!st.value.trim()) errors.push(`${at}: duration required.`);
           validateDuration(st.value, at, errors);
-        } else if (st.action === "inject-lag") {
+        } else if (st.action === "assert-heap") {
+        line = `  - assert-heap:\n      max-percent: ${st.heapPct||80}\n      window: ${st.timeout||"30s"}`;
+      } else if (st.action === "inject-lag") {
           if (!st.value.trim()) errors.push(`${at}: duration required.`);
           validateDuration(st.value, `${at}.duration`, errors);
           const regs = parseInt(st.regions || "2", 10);
@@ -773,6 +779,8 @@
           if (isNaN(regs) || regs < 1 || regs > 64) errors.push(`${at}: regions must be 1..64.`);
           if (st.mode === "merge-split" && regs < 2) errors.push(`${at}: merge-split requires at least 2 regions.`);
           if (isNaN(sp) || sp < 768) errors.push(`${at}: spacing must be >= 768 blocks (3 Folia 16-chunk sections).`);
+        } else if (st.action === "assert-heap") {
+          extra = `<label>max-percent <input type="number" min="0" max="100" value="${st.heapPct||80}" style="width:60px" onchange="updateStep(${idx},'heapPct',+this.value)" /></label>`;
         } else if (st.action === "no-barrier-stall") {
           if (!st.value.trim()) errors.push(`${at}: max-stall duration required.`);
           validateDuration(st.value, `${at}.max-stall`, errors);

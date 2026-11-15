@@ -22,15 +22,17 @@ import kotlin.io.path.name
 object ScenarioFile {
 
     private val TOP_LEVEL = setOf(
-        "name", "platform", "platforms", "version", "versions", "plugin", "plugins", "properties",
+        "name", "extends", "platform", "platforms", "version", "versions", "plugin", "plugins", "properties",
         "memory", "java", "jvm-args", "ready", "ready-timeout", "stop", "stop-timeout", "forbid",
         "crash-guard", "steps", "timeout", "allow-prerelease",
     )
 
     private val STEP_ACTIONS = setOf(
         "expect", "not-expect", "send", "wait", "enabled", "file-exists", "file-not-exists", "file-contains",
-        "inject-lag", "no-barrier-stall",
+        "inject-lag", "no-barrier-stall", "assert-heap",
     )
+
+    private val ASSERT_HEAP_KEYS = setOf("max-percent", "window")
     private val STEP_KEYS = STEP_ACTIONS + setOf("timeout", "match")
 
     private val INJECT_LAG_KEYS = setOf(
@@ -52,7 +54,97 @@ object ScenarioFile {
         val root = document as? Map<*, *>
             ?: throw SetupError("${path.name} must be a YAML mapping of keys, not a ${kind(document)}.")
 
+        // Resolve scenario inheritance: if the scenario has an `extends:` key, load the base file
+        // and use it as the foundation. Keys in the child override the base, and list-valued keys
+        // (plugins, jvm-args, forbid) are appended to the base list rather than replaced.
+        val extendsPath = root["extends"]?.toString()
+        if (extendsPath != null) {
+            val basePath = (path.parent ?: path.fileSystem.getPath(".")).resolve(extendsPath)
+            if (!basePath.exists()) {
+                throw SetupError("${path.name}: extends: '$extendsPath' not found at $basePath.")
+            }
+            if (basePath.toAbsolutePath().normalize() == path.toAbsolutePath().normalize()) {
+                throw SetupError("${path.name}: extends: a scenario cannot extend itself.")
+            }
+            val base = read(basePath)
+            return parseWithBase(root, base, fallbackName = path.name.substringBeforeLast('.'), where = path.name)
+        }
+
         return parse(root, fallbackName = path.name.substringBeforeLast('.'), where = path.name)
+    }
+
+    /**
+     * Parse a scenario that extends a base.
+     *
+     * Inheritance rules:
+     * - Scalar keys (memory, java, ready, ready-timeout, stop, stop-timeout, crash-guard, allow-prerelease):
+     *   child overrides base when present, inherits base when absent.
+     * - List keys (plugins, jvm-args, forbid): child entries are **appended** to the base list.
+     * - `platforms`, `versions`: child overrides base when present (at least one platform/version pair
+     *   must come from either the child or the base).
+     * - `steps`: always taken from the child (the child owns the test assertions).
+     * - `name`: child overrides base when present.
+     */
+    private fun parseWithBase(root: Map<*, *>, base: Scenario, fallbackName: String, where: String): Scenario {
+        for (key in root.keys) {
+            val name = key.toString()
+            if (name !in TOP_LEVEL) {
+                val hint = closestKey(name, TOP_LEVEL)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError(
+                    "$where has an unknown key '$name'.$hint Known keys: ${TOP_LEVEL.sorted().joinToString(", ")}.",
+                )
+            }
+        }
+
+        val stepTimeout = duration(root["timeout"], "timeout", where) ?: Duration.ofSeconds(60)
+        val steps = steps(root["steps"], stepTimeout, where)
+        if (steps.isEmpty()) {
+            throw SetupError("$where has no steps, so there is nothing to check. Add at least one expect.")
+        }
+
+        // Platforms: child overrides base entirely when present; falls back to base.
+        val platforms = root["platforms"] ?: root["platform"]
+        val resolvedPlatforms = if (platforms != null) {
+            strings(platforms, "platforms", where).map { name ->
+                try { Platform.of(name) } catch (e: IllegalArgumentException) { throw SetupError("$where: ${e.message}") }
+            }
+        } else {
+            base.platforms
+        }
+
+        // Versions: same override logic as platforms.
+        val versions = root["versions"] ?: root["version"]
+        val resolvedVersions = if (versions != null) {
+            strings(versions, "versions", where).ifEmpty { listOf(com.salyvn.mcstage.core.BuildIndex.LATEST) }
+        } else {
+            base.versions
+        }
+
+        return Scenario(
+            name = root["name"]?.toString() ?: fallbackName,
+            platforms = resolvedPlatforms,
+            versions = resolvedVersions,
+            steps = steps,
+            // List keys: child entries appended to base.
+            plugins = base.plugins + strings(root["plugins"] ?: root["plugin"], "plugins", where),
+            properties = base.properties + properties(root["properties"], where),
+            memory = root["memory"]?.toString() ?: base.memory,
+            java = root["java"]?.toString() ?: base.java,
+            jvmArgs = base.jvmArgs + strings(root["jvm-args"], "jvm-args", where),
+            ready = if (root.containsKey("ready")) {
+                parseMatcher(root["ready"]!!.toString(), "ready", where)
+            } else {
+                base.ready
+            },
+            readyTimeout = duration(root["ready-timeout"], "ready-timeout", where) ?: base.readyTimeout,
+            stopCommand = root["stop"]?.toString() ?: base.stopCommand,
+            stopTimeout = duration(root["stop-timeout"], "stop-timeout", where) ?: base.stopTimeout,
+            forbid = base.forbid + strings(root["forbid"], "forbid", where).mapIndexed { idx, spec ->
+                parseMatcher(spec, "forbid[$idx]", where)
+            },
+            crashGuard = if (root.containsKey("crash-guard")) booleanFlag(root["crash-guard"], "crash-guard", where) else base.crashGuard,
+            allowPrerelease = if (root.containsKey("allow-prerelease")) booleanFlag(root["allow-prerelease"], "allow-prerelease", where) else base.allowPrerelease,
+        )
     }
 
     fun parse(root: Map<*, *>, fallbackName: String, where: String): Scenario {
@@ -175,6 +267,8 @@ object ScenarioFile {
                 step.containsKey("inject-lag") -> parseInjectLag(step, explicitTimeout, at)
 
                 step.containsKey("no-barrier-stall") -> parseNoBarrierStall(step, explicitTimeout, at)
+
+                step.containsKey("assert-heap") -> parseAssertHeap(step, explicitTimeout, at)
 
                 else -> throw SetupError(
                     "$at does not say what to do. Use one of: ${
@@ -325,6 +419,32 @@ object ScenarioFile {
             ?: throw SetupError("$where: $what must be an integer, got '$node'.")
 
         else -> throw SetupError("$where: $what must be an integer.")
+    }
+
+    private fun parseAssertHeap(step: Map<*, *>, explicitTimeout: Duration?, at: String): Step.AssertHeap {
+        val raw = step["assert-heap"]
+        val rawMap = raw as? Map<*, *>
+            ?: throw SetupError("$at: assert-heap must be a mapping with max-percent and window.")
+        for (k in rawMap.keys) {
+            if (k.toString() !in ASSERT_HEAP_KEYS) {
+                val hint = closestKey(k.toString(), ASSERT_HEAP_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError(
+                    "$at: assert-heap has an unknown key '$k'.$hint Known keys: ${ASSERT_HEAP_KEYS.sorted().joinToString(", ")}.",
+                )
+            }
+        }
+        val maxPct = integer(rawMap["max-percent"], "assert-heap.max-percent", at)
+            ?: throw SetupError("$at: assert-heap.max-percent is required (0-100).")
+        if (maxPct < 0 || maxPct > 100) {
+            throw SetupError("$at: assert-heap.max-percent must be between 0 and 100, got $maxPct.")
+        }
+        val window = explicitTimeout
+            ?: duration(rawMap["window"], "assert-heap.window", at)
+            ?: Duration.ofSeconds(60)
+        if (window.isZero || window.isNegative) {
+            throw SetupError("$at: assert-heap.window must be greater than 0ms.")
+        }
+        return Step.AssertHeap(maxPercent = maxPct, window = window)
     }
 
     private fun parseFileContains(step: Map<*, *>, timeout: Duration, at: String): Step.FileContains {

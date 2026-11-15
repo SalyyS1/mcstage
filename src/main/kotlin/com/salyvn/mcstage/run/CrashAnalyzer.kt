@@ -156,6 +156,15 @@ object CrashAnalyzer {
             help = "Inspect Spark or JFR tick profiles, replace synchronous chunk loads with async chunk tickets, and verify threshold budgets with no-barrier-stall.",
             fatalForCrashGuard = false,
         ),
+        DiagnosticRule(
+            id = "MCS014",
+            name = "HeapUsageExceeded",
+            defaultSeverity = "warning",
+            shortDescription = "JVM heap usage exceeded the assert-heap threshold",
+            fullDescription = "GC log output showed peak heap usage above the threshold configured in the assert-heap scenario step. This often indicates a memory leak in plugin code or an undersized -Xmx budget.",
+            help = "Profile heap with Spark /sparkm heap or VisualVM, check for plugin entity/cache leaks, and increase -Xmx if usage is expected.",
+            fatalForCrashGuard = false,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }

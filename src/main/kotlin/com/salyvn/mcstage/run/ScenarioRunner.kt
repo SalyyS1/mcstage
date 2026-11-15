@@ -287,6 +287,12 @@ class ScenarioRunner(
                     }
                     stepRes
                 }
+
+                is Step.AssertHeap -> {
+                    val stepRes = awaitAssertHeap(step, server, consume, ::took)
+                    if (!stepRes.ok) overrideRuleId = "MCS014"
+                    stepRes
+                }
             }
 
             steps += result
@@ -664,6 +670,70 @@ class ScenarioRunner(
         }
 
         return StepResult(step.describe, ok = true, elapsed = took(), matched = probeNote) to null
+    }
+
+    /**
+     * Drains server output for [step.window] milliseconds, collecting every GC-related line, then
+     * asserts that the peak heap usage percent never exceeded [step.maxPercent].
+     *
+     * When no GC lines appear during the window (e.g. because GC logging is not enabled), the step
+     * passes with a note so the author knows to add `-verbose:gc` to `jvm-args`.
+     */
+    private fun awaitAssertHeap(
+        step: Step.AssertHeap,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val gcLines = mutableListOf<String>()
+        val deadlineNanos = System.nanoTime() + step.window.toNanos()
+
+        while (true) {
+            val remainingMillis = (deadlineNanos - System.nanoTime()) / 1_000_000L
+            if (remainingMillis <= 0) break
+            val outcome = server.drain(minOf(FILE_POLL_MILLIS, remainingMillis)) { line ->
+                consume(line)
+                if (HeapUsageAnalyzer.isGcLine(line.text)) {
+                    gcLines += line.text
+                }
+            }
+            if (outcome is WaitResult.Exited) {
+                return StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = "server exited with code ${outcome.exitCode} during heap assertion",
+                )
+            }
+        }
+
+        if (gcLines.isEmpty()) {
+            return StepResult(
+                step.describe,
+                ok = true,
+                elapsed = took(),
+                matched = "no GC log lines observed (enable -verbose:gc in jvm-args to get heap data)",
+            )
+        }
+
+        val peakPct = HeapUsageAnalyzer.peakUsagePercent(gcLines)
+        return if (peakPct == null || peakPct <= step.maxPercent) {
+            StepResult(
+                step.describe,
+                ok = true,
+                elapsed = took(),
+                matched = peakPct?.let { "peak heap %.1f%%".format(java.util.Locale.ROOT, it) },
+            )
+        } else {
+            val formatted = "%.1f".format(java.util.Locale.ROOT, peakPct)
+            StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "heap peaked at $formatted% (threshold ${step.maxPercent}%)",
+                matched = gcLines.lastOrNull(),
+            )
+        }
     }
 
     private companion object {

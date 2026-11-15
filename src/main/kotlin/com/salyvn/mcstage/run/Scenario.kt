@@ -104,6 +104,34 @@ sealed interface Step {
                 "expect no chunk/region barrier stall > ${Durations.format(maxStall)} for ${Durations.format(window)}"
             }
     }
+
+    /**
+     * Asserts that heap usage observed in JVM GC log output never exceeds [maxPercent] over [window].
+     *
+     * The assertion is evaluated by scanning every GC-related line the server emits during the window
+     * and computing the peak heap-used / heap-max ratio. It fails when any observation exceeds the
+     * configured threshold, letting scenario authors detect slow memory leaks without a profiler.
+     *
+     * JVM GC logging must be enabled for the lines to appear: Paper/Folia enable -Xlog:gc by default
+     * in recent builds; for older builds, add `-verbose:gc` to [Scenario.jvmArgs].
+     *
+     * Example YAML:
+     * ```yaml
+     * steps:
+     *   - assert-heap:
+     *       max-percent: 80
+     *       window: 30s
+     * ```
+     */
+    data class AssertHeap(
+        /** Maximum allowed heap usage, as a percentage of the configured heap maximum [0, 100]. */
+        val maxPercent: Int,
+        /** How long to watch GC output before passing. */
+        val window: Duration,
+    ) : Step {
+        override val describe: String
+            get() = "assert heap usage <= $maxPercent% for ${Durations.format(window)}"
+    }
 }
 
 /** Ensures scenario file assertions never escape the server instance directory. */

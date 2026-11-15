@@ -298,6 +298,162 @@ class ScenarioFileTest {
         assertTrue(orphanProbeExpect.message!!.contains("probe-command"), orphanProbeExpect.message!!)
     }
 
+
+    @Test
+    fun `assert-heap step is parsed with max-percent and window`() {
+        val scenario = write(
+            """
+            platform: paper
+            steps:
+              - expect: "Done ("
+              - assert-heap:
+                  max-percent: 80
+                  window: 15s
+            """,
+        )
+        val step = scenario.steps[1] as Step.AssertHeap
+        assertEquals(80, step.maxPercent)
+        assertEquals(java.time.Duration.ofSeconds(15), step.window)
+        assertTrue(step.describe.contains("80%"))
+    }
+
+    @Test
+    fun `assert-heap rejects out-of-range max-percent`() {
+        assertTrue(
+            assertThrows<com.salyvn.mcstage.core.SetupError> {
+                write("""
+                    platform: paper
+                    steps:
+                      - assert-heap:
+                          max-percent: 150
+                          window: 10s
+                """)
+            }.message!!.contains("0 and 100"),
+        )
+        assertTrue(
+            assertThrows<com.salyvn.mcstage.core.SetupError> {
+                write("""
+                    platform: paper
+                    steps:
+                      - assert-heap:
+                          max-percent: -1
+                          window: 10s
+                """)
+            }.message!!.contains("0 and 100"),
+        )
+    }
+
+    @Test
+    fun `assert-heap rejects unknown keys`() {
+        val error = assertThrows<com.salyvn.mcstage.core.SetupError> {
+            write("""
+                platform: paper
+                steps:
+                  - assert-heap:
+                      max-percent: 70
+                      windwo: 5s
+            """)
+        }
+        assertTrue(error.message!!.contains("windwo"), error.message!!)
+    }
+
+    @Test
+    fun `extends inherits versions plugins and forbid from base`() {
+        // Write base scenario
+        val base = dir.resolve("base.yml")
+        java.nio.file.Files.writeString(
+            base,
+            """
+            name: base suite
+            platforms: [paper, purpur]
+            versions: ["1.21.4", "latest"]
+            memory: 3G
+            plugins:
+              - shared.jar
+            forbid:
+              - "Could not load"
+            steps:
+              - expect: "Done ("
+            """.trimIndent(),
+        )
+
+        // Child that extends base and adds its own plugin and step
+        val child = write(
+            """
+            extends: base.yml
+            name: child suite
+            plugins:
+              - extra.jar
+            steps:
+              - expect: "Done ("
+              - enabled: MyPlugin
+            """,
+        )
+
+        assertEquals("child suite", child.name)
+        assertEquals(listOf(com.salyvn.mcstage.core.Platform.PAPER, com.salyvn.mcstage.core.Platform.PURPUR), child.platforms)
+        assertEquals(listOf("1.21.4", "latest"), child.versions)
+        assertEquals("3G", child.memory)
+        // Plugins: base + child appended
+        assertEquals(listOf("shared.jar", "extra.jar"), child.plugins)
+        // Forbid inherited from base
+        assertEquals(1, child.forbid.size)
+        assertTrue(child.forbid[0].matches("Could not load MyPlugin"))
+        // Steps are from child only
+        assertEquals(2, child.steps.size)
+    }
+
+    @Test
+    fun `extends child overrides platforms and memory`() {
+        val base = dir.resolve("base.yml")
+        java.nio.file.Files.writeString(
+            base,
+            """
+            platform: paper
+            memory: 2G
+            steps:
+              - expect: "Done ("
+            """.trimIndent(),
+        )
+
+        val child = write(
+            """
+            extends: base.yml
+            platform: folia
+            memory: 4G
+            steps:
+              - expect: "Done ("
+            """,
+        )
+
+        assertEquals(listOf(com.salyvn.mcstage.core.Platform.FOLIA), child.platforms)
+        assertEquals("4G", child.memory)
+    }
+
+    @Test
+    fun `extends refuses a missing base file`() {
+        val error = assertThrows<com.salyvn.mcstage.core.SetupError> {
+            write("""
+                extends: does-not-exist.yml
+                steps:
+                  - expect: "Done ("
+            """)
+        }
+        assertTrue(error.message!!.contains("not found"), error.message!!)
+    }
+
+    @Test
+    fun `extends refuses a scenario that extends itself`() {
+        val error = assertThrows<com.salyvn.mcstage.core.SetupError> {
+            write("""
+                extends: scenario.yml
+                steps:
+                  - expect: "Done ("
+            """)
+        }
+        assertTrue(error.message!!.contains("cannot extend itself"), error.message!!)
+    }
+
     private fun write(text: String): Scenario {
         val file = dir.resolve("scenario.yml")
         Files.writeString(file, text.trimIndent())
