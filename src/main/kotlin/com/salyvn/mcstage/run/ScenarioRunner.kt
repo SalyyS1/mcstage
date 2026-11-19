@@ -4,6 +4,8 @@ import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.JavaRuntime
 import com.salyvn.mcstage.core.PortProbe
 import com.salyvn.mcstage.instance.Instance
+import com.salyvn.mcstage.rcon.LoopbackRconBridgeServer
+import com.salyvn.mcstage.rcon.RconFaultInjector
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -246,6 +248,7 @@ class ScenarioRunner(
         consume: (LogLine) -> Unit,
     ): StepFailure? {
         var barrierCursor = bootLineNumber
+        var recoveryCursor = bootLineNumber
         for (step in scenario.steps) {
             val startedAt = System.nanoTime()
             fun took() = Duration.ofNanos(System.nanoTime() - startedAt)
@@ -291,6 +294,24 @@ class ScenarioRunner(
                 is Step.AssertHeap -> {
                     val stepRes = awaitAssertHeap(step, server, consume, ::took)
                     if (!stepRes.ok) overrideRuleId = "MCS014"
+                    stepRes
+                }
+
+                is Step.AssertRegionRecovery -> {
+                    val (stepRes, violation) = awaitAssertRegionRecovery(step, server, recoveryCursor, consume, ::took)
+                    recoveryCursor = server.linesSeen
+                    if (violation != null) {
+                        overrideRuleId = "MCS015"
+                        failureLine = violation.lineNumber?.let { num ->
+                            server.transcript.firstOrNull { it.number == num }
+                        }
+                    }
+                    stepRes
+                }
+
+                is Step.RconFault -> {
+                    val (stepRes, rconRule) = runRconFault(step, server, consume, ::took)
+                    if (rconRule != null) overrideRuleId = rconRule
                     stepRes
                 }
             }
@@ -733,6 +754,137 @@ class ScenarioRunner(
                 detail = "heap peaked at $formatted% (threshold ${step.maxPercent}%)",
                 matched = gcLines.lastOrNull(),
             )
+        }
+    }
+
+    private fun awaitAssertRegionRecovery(
+        step: Step.AssertRegionRecovery,
+        server: ServerProcess,
+        recoveryCursor: Int,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): Pair<StepResult, FoliaCrashRecoveryAnalyzer.Violation?> {
+        if (step.faultCommand != null) {
+            try {
+                server.send(step.faultCommand)
+            } catch (e: Exception) {
+                val msg = e.message ?: "failed to send fault-command '${step.faultCommand}'"
+                val v = FoliaCrashRecoveryAnalyzer.Violation(
+                    kind = FoliaCrashRecoveryAnalyzer.Kind.PROBE_FAILED,
+                    regionKey = "region:default",
+                    message = msg,
+                )
+                return StepResult(step.describe, ok = false, elapsed = took(), detail = msg) to v
+            }
+        }
+
+        val deadlineNanos = System.nanoTime() + step.window.toNanos()
+        var probeDispatched = false
+        while (true) {
+            val remainingMillis = (deadlineNanos - System.nanoTime()) / 1_000_000L
+            if (remainingMillis <= 0L) break
+            val slice = minOf(FILE_POLL_MILLIS, remainingMillis)
+            val drained = server.drain(slice, consume)
+            if (drained is WaitResult.Exited) {
+                val msg = "the server exited with code ${drained.exitCode} during Folia region recovery check"
+                val v = FoliaCrashRecoveryAnalyzer.Violation(
+                    kind = FoliaCrashRecoveryAnalyzer.Kind.PROBE_FAILED,
+                    regionKey = "region:default",
+                    message = msg,
+                )
+                return StepResult(step.describe, ok = false, elapsed = took(), detail = msg) to v
+            }
+            if (!probeDispatched && step.probeCommand != null) {
+                probeDispatched = true
+                try {
+                    server.send(step.probeCommand)
+                } catch (e: Exception) {
+                    val msg = e.message ?: "failed to send probe-command '${step.probeCommand}'"
+                    val v = FoliaCrashRecoveryAnalyzer.Violation(
+                        kind = FoliaCrashRecoveryAnalyzer.Kind.PROBE_FAILED,
+                        regionKey = "region:default",
+                        message = msg,
+                    )
+                    return StepResult(step.describe, ok = false, elapsed = took(), detail = msg) to v
+                }
+            }
+        }
+
+        val windowLines = server.transcript.filter { it.number > recoveryCursor }
+        val assessment = FoliaCrashRecoveryAnalyzer.evaluate(
+            transcript = windowLines,
+            maxFaultsPerRegion = step.maxFaults,
+            loopWindow = step.loopWindow,
+            maxRecoveryTime = step.maxRecovery,
+            requireRecoveryOnFault = step.requireRecovery,
+            customRecoveryMatcher = step.recoveryExpect,
+        )
+        assessment.violation?.let { v ->
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = v.message,
+                matched = v.matchedLine,
+            ) to v
+        }
+
+        val note = if (assessment.totalFaults == 0) {
+            "0 regional faults observed"
+        } else {
+            "${assessment.totalFaults} fault(s) contained, recovered ${assessment.recoveredRegions.joinToString(", ")}"
+        }
+        return StepResult(step.describe, ok = true, elapsed = took(), matched = note) to null
+    }
+
+    private fun runRconFault(
+        step: Step.RconFault,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): Pair<StepResult, String?> {
+        val profile = step.profile
+        if (profile.port != null) {
+            val report = RconFaultInjector.execute(profile.port, profile)
+            server.drain(minOf(FILE_POLL_MILLIS, 50L), consume)
+            return if (report.ok) {
+                StepResult(step.describe, ok = true, elapsed = took(), matched = report.summaryNote()) to null
+            } else {
+                StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = report.failureDetail ?: "RCON fault injection failed",
+                    matched = report.summaryNote(),
+                ) to (report.failureRuleId ?: "MCS017")
+            }
+        }
+
+        val dispatchLock = Any()
+        LoopbackRconBridgeServer(profile.password) { cmd ->
+            synchronized(dispatchLock) {
+                val captured = mutableListOf<String>()
+                server.send(cmd)
+                server.drain(35L) { line ->
+                    consume(line)
+                    captured += line.text
+                }
+                captured.joinToString("\n").ifEmpty { "ok: $cmd" }
+            }
+        }.use { bridge ->
+            bridge.start()
+            val report = RconFaultInjector.execute(bridge.port, profile)
+            return if (report.ok) {
+                StepResult(step.describe, ok = true, elapsed = took(), matched = report.summaryNote()) to null
+            } else {
+                StepResult(
+                    step.describe,
+                    ok = false,
+                    elapsed = took(),
+                    detail = report.failureDetail ?: "RCON fault injection failed",
+                    matched = report.summaryNote(),
+                ) to (report.failureRuleId ?: "MCS017")
+            }
         }
     }
 

@@ -93,6 +93,23 @@ object FakeServer {
                 log("ERROR", "[ThreadedRegionizer] Region merge barrier stalled waiting on chunk (48, 0)")
                 continue
             }
+            if (command.startsWith("emit-region-fault ")) {
+                val mode = command.removePrefix("emit-region-fault ").trim()
+                println("[12:00:05 ERROR]: [Region Scheduler Thread #2/ERROR]: Exception ticking region section(3, -1)")
+                if (mode == "recover") {
+                    TimeUnit.MILLISECONDS.sleep(25)
+                    log("INFO", "Recovered region section(3, -1) and resumed ticking")
+                }
+                System.out.flush()
+                continue
+            }
+            if (command == "emit-region-crash-loop") {
+                for (i in 1..3) {
+                    println("[12:00:05 ERROR]: Exception ticking region chunk (32, -16) on tick #$i")
+                }
+                System.out.flush()
+                continue
+            }
             if (command.startsWith("emit-lag ")) {
                 val ms = command.removePrefix("emit-lag ").trim().toLongOrNull() ?: 1000L
                 val ticks = maxOf(1L, ms / 50L)

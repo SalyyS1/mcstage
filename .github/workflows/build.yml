@@ -55,9 +55,22 @@ jobs:
                 max-stall: 400ms
                 probe-command: "list"
               timeout: 1s
+            - assert-region-recovery:
+                max-faults: 1
+                loop-window: 5s
+                max-recovery: 1500ms
+                window: 1s
+            - rcon-fault:
+                commands: ["list"]
+                iterations: 4
+                latency: 20ms
+                drop-rate: 25%
+                max-retries: 4
+                max-p95: 350ms
+                seed: 42
           YAML
           java -jar "$JAR" validate /tmp/folia-barrier.yml --json > /tmp/folia-validated.json
-          jq -e '.valid == true and (.stepsCount == 2) and (.crashGuard == true)' /tmp/folia-validated.json
+          jq -e '.valid == true and (.stepsCount == 4) and (.crashGuard == true)' /tmp/folia-validated.json
           set +e
           java -jar "$JAR" test /tmp/generated.yml --offline --work /tmp/work --sarif /tmp/mcstage.sarif > /tmp/out.txt 2>&1
           code=$?
@@ -65,7 +78,7 @@ jobs:
           cat /tmp/out.txt
           test "$code" = "2" || { echo "expected exit code 2 for a run that could not start, got $code"; exit 1; }
           jq -e '.version == "2.1.0" and .runs[0].tool.driver.name == "mcstage"' /tmp/mcstage.sarif
-          jq -e '[.runs[0].tool.driver.rules[].id] | index("MCS001") != null and index("MCS003") != null and index("MCS012") != null and index("MCS013") != null' /tmp/mcstage.sarif
+          jq -e '[.runs[0].tool.driver.rules[].id] | index("MCS001") != null and index("MCS003") != null and index("MCS012") != null and index("MCS015") != null and index("MCS016") != null and index("MCS017") != null' /tmp/mcstage.sarif
           jq -e '.runs[0].results[0].ruleId == "MCS011" and .runs[0].results[0].locations[0].physicalLocation.artifactLocation.uriBaseId == "%SRCROOT%"' /tmp/mcstage.sarif
           mkdir -p /tmp/junit-shards
           printf '<testsuite name="shard-a" tests="1" failures="0" errors="0" time="1.500"><testcase classname="mcstage.paper" name="paper 26.3" time="1.500"/></testsuite>\n' > /tmp/junit-shards/a.xml

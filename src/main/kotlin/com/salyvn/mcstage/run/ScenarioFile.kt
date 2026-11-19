@@ -3,6 +3,7 @@ package com.salyvn.mcstage.run
 import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.Platform
 import com.salyvn.mcstage.core.SetupError
+import com.salyvn.mcstage.rcon.RconFaultProfile
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
@@ -29,10 +30,19 @@ object ScenarioFile {
 
     private val STEP_ACTIONS = setOf(
         "expect", "not-expect", "send", "wait", "enabled", "file-exists", "file-not-exists", "file-contains",
-        "inject-lag", "no-barrier-stall", "assert-heap",
+        "inject-lag", "no-barrier-stall", "assert-heap", "assert-region-recovery", "rcon-fault",
     )
 
     private val ASSERT_HEAP_KEYS = setOf("max-percent", "window")
+    private val ASSERT_REGION_RECOVERY_KEYS = setOf(
+        "max-faults", "loop-window", "max-recovery", "window", "require-recovery",
+        "fault-command", "recovery-expect", "probe-command",
+    )
+    private val RCON_FAULT_KEYS = setOf(
+        "command", "commands", "iterations", "latency", "jitter", "drop-rate", "corrupt-rate",
+        "max-retries", "retry-backoff", "attempt-timeout", "max-p95", "seed", "port", "password",
+        "expect-response",
+    )
     private val STEP_KEYS = STEP_ACTIONS + setOf("timeout", "match")
 
     private val INJECT_LAG_KEYS = setOf(
@@ -270,6 +280,10 @@ object ScenarioFile {
 
                 step.containsKey("assert-heap") -> parseAssertHeap(step, explicitTimeout, at)
 
+                step.containsKey("assert-region-recovery") -> parseAssertRegionRecovery(step, explicitTimeout, at)
+
+                step.containsKey("rcon-fault") -> parseRconFault(step, explicitTimeout, at)
+
                 else -> throw SetupError(
                     "$at does not say what to do. Use one of: ${
                         STEP_ACTIONS.sorted().joinToString(", ")
@@ -445,6 +459,187 @@ object ScenarioFile {
             throw SetupError("$at: assert-heap.window must be greater than 0ms.")
         }
         return Step.AssertHeap(maxPercent = maxPct, window = window)
+    }
+
+    private fun parseAssertRegionRecovery(
+        step: Map<*, *>,
+        explicitTimeout: Duration?,
+        at: String,
+    ): Step.AssertRegionRecovery {
+        val raw = step["assert-region-recovery"]
+        if (raw !is Map<*, *>) {
+            val win = duration(raw, "assert-region-recovery", at)
+                ?: throw SetupError("$at: assert-region-recovery needs a window duration such as 2s or a mapping.")
+            if (win.isZero || win.isNegative) {
+                throw SetupError("$at: assert-region-recovery window must be greater than 0ms.")
+            }
+            return Step.AssertRegionRecovery(window = win)
+        }
+
+        for (k in raw.keys) {
+            val keyName = k.toString()
+            if (keyName !in ASSERT_REGION_RECOVERY_KEYS) {
+                val hint = closestKey(keyName, ASSERT_REGION_RECOVERY_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError(
+                    "$at: assert-region-recovery has an unknown key '$keyName'.$hint Known keys: ${
+                        ASSERT_REGION_RECOVERY_KEYS.sorted().joinToString(", ")
+                    }.",
+                )
+            }
+        }
+
+        val maxFaults = integer(raw["max-faults"], "assert-region-recovery.max-faults", at) ?: 1
+        if (maxFaults < 0 || maxFaults > 100) {
+            throw SetupError("$at: assert-region-recovery.max-faults must be between 0 and 100, got $maxFaults.")
+        }
+        val loopWindow = duration(raw["loop-window"], "assert-region-recovery.loop-window", at) ?: Duration.ofSeconds(5)
+        if (loopWindow.isZero || loopWindow.isNegative) {
+            throw SetupError("$at: assert-region-recovery.loop-window must be greater than 0ms.")
+        }
+        val maxRecovery = duration(raw["max-recovery"], "assert-region-recovery.max-recovery", at) ?: Duration.ofSeconds(2)
+        if (maxRecovery.isZero || maxRecovery.isNegative) {
+            throw SetupError("$at: assert-region-recovery.max-recovery must be greater than 0ms.")
+        }
+        val window = duration(raw["window"], "assert-region-recovery.window", at)
+            ?: explicitTimeout
+            ?: Duration.ofSeconds(1)
+        if (window.isZero || window.isNegative) {
+            throw SetupError("$at: assert-region-recovery.window must be greater than 0ms.")
+        }
+        val requireRecovery = if (raw.containsKey("require-recovery")) {
+            booleanFlag(raw["require-recovery"], "assert-region-recovery.require-recovery", at)
+        } else {
+            true
+        }
+        val faultCmd = raw["fault-command"]?.let { text(it, "assert-region-recovery.fault-command", at).trim() }
+            ?.also { if (it.isEmpty()) throw SetupError("$at: assert-region-recovery.fault-command cannot be blank.") }
+        val recoveryExpect = raw["recovery-expect"]?.let {
+            parseMatcher(text(it, "assert-region-recovery.recovery-expect", at), "assert-region-recovery.recovery-expect", at)
+        }
+        val probeCmd = raw["probe-command"]?.let { text(it, "assert-region-recovery.probe-command", at).trim() }
+            ?.also { if (it.isEmpty()) throw SetupError("$at: assert-region-recovery.probe-command cannot be blank.") }
+
+        return Step.AssertRegionRecovery(
+            maxFaults = maxFaults,
+            loopWindow = loopWindow,
+            maxRecovery = maxRecovery,
+            window = window,
+            requireRecovery = requireRecovery,
+            faultCommand = faultCmd,
+            recoveryExpect = recoveryExpect,
+            probeCommand = probeCmd,
+        )
+    }
+
+    private fun parseRconFault(step: Map<*, *>, explicitTimeout: Duration?, at: String): Step.RconFault {
+        val raw = step["rcon-fault"]
+        if (raw !is Map<*, *>) {
+            val cmd = text(raw, "rcon-fault", at).trim()
+            if (cmd.isEmpty()) throw SetupError("$at: rcon-fault command cannot be blank.")
+            return Step.RconFault(RconFaultProfile(commands = listOf(cmd)))
+        }
+
+        for (k in raw.keys) {
+            val keyName = k.toString()
+            if (keyName !in RCON_FAULT_KEYS) {
+                val hint = closestKey(keyName, RCON_FAULT_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError(
+                    "$at: rcon-fault has an unknown key '$keyName'.$hint Known keys: ${
+                        RCON_FAULT_KEYS.sorted().joinToString(", ")
+                    }.",
+                )
+            }
+        }
+
+        val commands = strings(raw["commands"] ?: raw["command"], "rcon-fault.commands", at)
+            .map { it.trim() }
+            .ifEmpty { listOf("list") }
+        if (commands.any { it.isEmpty() }) {
+            throw SetupError("$at: rcon-fault command cannot be blank.")
+        }
+        val iterations = integer(raw["iterations"], "rcon-fault.iterations", at) ?: 4
+        if (iterations !in 1..200) {
+            throw SetupError("$at: rcon-fault.iterations must be between 1 and 200, got $iterations.")
+        }
+        val latency = duration(raw["latency"], "rcon-fault.latency", at) ?: Duration.ofMillis(20)
+        if (latency.isNegative) {
+            throw SetupError("$at: rcon-fault.latency cannot be negative.")
+        }
+        val jitter = duration(raw["jitter"], "rcon-fault.jitter", at) ?: Duration.ofMillis(10)
+        if (jitter.isNegative) {
+            throw SetupError("$at: rcon-fault.jitter cannot be negative.")
+        }
+        val dropRate = ratio(raw["drop-rate"], "rcon-fault.drop-rate", at) ?: 0.2
+        val corruptRate = ratio(raw["corrupt-rate"], "rcon-fault.corrupt-rate", at) ?: 0.0
+        val maxRetries = integer(raw["max-retries"], "rcon-fault.max-retries", at) ?: 3
+        if (maxRetries !in 0..10) {
+            throw SetupError("$at: rcon-fault.max-retries must be between 0 and 10, got $maxRetries.")
+        }
+        val retryBackoff = duration(raw["retry-backoff"], "rcon-fault.retry-backoff", at) ?: Duration.ofMillis(20)
+        if (retryBackoff.isNegative) {
+            throw SetupError("$at: rcon-fault.retry-backoff cannot be negative.")
+        }
+        val attemptTimeout = duration(raw["attempt-timeout"], "rcon-fault.attempt-timeout", at)
+            ?: explicitTimeout
+            ?: Duration.ofMillis(500)
+        if (attemptTimeout.isZero || attemptTimeout.isNegative) {
+            throw SetupError("$at: rcon-fault.attempt-timeout must be greater than 0ms.")
+        }
+        val maxP95 = duration(raw["max-p95"], "rcon-fault.max-p95", at) ?: Duration.ofMillis(400)
+        if (maxP95.isZero || maxP95.isNegative) {
+            throw SetupError("$at: rcon-fault.max-p95 must be greater than 0ms.")
+        }
+        val seed = longInteger(raw["seed"], "rcon-fault.seed", at) ?: 42L
+        val port = integer(raw["port"], "rcon-fault.port", at)?.also {
+            if (it !in 1..65535) throw SetupError("$at: rcon-fault.port must be between 1 and 65535, got $it.")
+        }
+        val password = raw["password"]?.let { text(it, "rcon-fault.password", at) } ?: "mcstage-rcon"
+        val expectResp = raw["expect-response"]?.let {
+            parseMatcher(text(it, "rcon-fault.expect-response", at), "rcon-fault.expect-response", at)
+        }
+
+        return Step.RconFault(
+            RconFaultProfile(
+                commands = commands,
+                iterations = iterations,
+                baseLatency = latency,
+                jitter = jitter,
+                dropRate = dropRate,
+                corruptRate = corruptRate,
+                maxRetries = maxRetries,
+                retryBackoff = retryBackoff,
+                attemptTimeout = attemptTimeout,
+                maxP95Latency = maxP95,
+                seed = seed,
+                port = port,
+                password = password,
+                expectResponse = expectResp,
+            ),
+        )
+    }
+
+    private fun ratio(node: Any?, what: String, where: String): Double? {
+        if (node == null) return null
+        val value = when (node) {
+            is Number -> node.toDouble()
+            is String -> node.trim().removeSuffix("%").toDoubleOrNull()?.let {
+                if (node.trim().endsWith("%")) it / 100.0 else it
+            } ?: throw SetupError("$where: $what must be a ratio in [0.0, 1.0], got '$node'.")
+            else -> throw SetupError("$where: $what must be a ratio in [0.0, 1.0].")
+        }
+        if (!value.isFinite() || value < 0.0 || value > 1.0) {
+            throw SetupError("$where: $what must be between 0.0 and 1.0, got $value.")
+        }
+        return value
+    }
+
+    private fun longInteger(node: Any?, what: String, where: String): Long? = when (node) {
+        null -> null
+        is Long -> node
+        is Number -> node.toLong()
+        is String -> node.trim().toLongOrNull()
+            ?: throw SetupError("$where: $what must be an integer, got '$node'.")
+        else -> throw SetupError("$where: $what must be an integer.")
     }
 
     private fun parseFileContains(step: Map<*, *>, timeout: Duration, at: String): Step.FileContains {

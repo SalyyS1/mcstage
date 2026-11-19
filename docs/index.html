@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.5.0 | Real-Server Plugin Matrix Builder, Heap Assertion, Folia Barrier &amp; JUnit Aggregator Lab</title>
-  <meta name="description" content="Zero-upload browser builder and validator for mcstage v0.5.0 YAML scenarios: assert-heap JVM heap assertions, extends inheritance, Folia barrier topology, MCS001-MCS014 SARIF v2.1.0 diagnostics, and JUnit XML aggregation." />
+  <title>mcstage v0.6.0 | Real-Server Plugin Matrix Builder, Folia Crash-Loop Recovery, RCON Fault &amp; JUnit Aggregator Lab</title>
+  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.6.0 YAML scenarios: assert-region-recovery Folia crash-loop guards, deterministic SplitMix64 RCON latency/packet-loss fault injection (MCS015-MCS017), assert-heap JVM heap assertions, SARIF v2.1.0 diagnostics, and JUnit XML aggregation." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -287,23 +287,24 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.5.0 | Zero-Upload Browser Tool</span>
+        <span class="badge">mcstage v0.6.0 | Zero-Upload Browser Tool</span>
         <div class="navlinks">
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
           <a href="https://github.com/SalyyS1/mcstage/releases">Releases (CLI JAR)</a>
         </div>
       </div>
-      <h1>MCStage Real-Server Plugin Matrix Builder, Folia Barrier &amp; JUnit Aggregator Lab</h1>
+      <h1>MCStage Real-Server Plugin Matrix Builder, Folia Recovery, RCON Fault &amp; JUnit Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios with assert-heap JVM heap assertions, extends scenario inheritance, inject-lag and no-barrier-stall budgets, test MCS001-MCS014 SARIF v2.1.0 diagnostics, and aggregate JUnit XML suites locally in your browser.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with assert-region-recovery crash-loop guards, deterministic Source RCON latency and packet-loss fault injection, assert-heap JVM heap budgets, MCS001-MCS017 SARIF v2.1.0 diagnostics, and JUnit XML aggregation locally in your browser.
       </p>
     </div>
   </header>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabBuilderBtn" onclick="switchTab('builder')">1. Scenario Matrix &amp; CI Workflow Builder</button>
-    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash &amp; Barrier Classifier (MCS001-MCS014)</button>
+    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS017)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
+    <button class="tab-btn" id="tabRconBtn" onclick="switchTab('rcon')">4. RCON Wire &amp; Fault Injection Lab</button>
   </div>
 
   <main>
@@ -313,7 +314,7 @@
           <span>Scenario Configuration</span>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn" onclick="loadPreset('warps')">Warps Reload Preset</button>
-            <button class="btn" onclick="loadPreset('folia')">Folia Multi-Region Barrier Gate</button>
+            <button class="btn" onclick="loadPreset('folia')">Folia Recovery &amp; RCON Fault Gate</button>
           </div>
         </h2>
 
@@ -333,7 +334,7 @@
           <label><input type="checkbox" id="pfPaper" checked onchange="renderScenario()" /> paper</label>
           <label><input type="checkbox" id="pfFolia" checked onchange="renderScenario()" /> folia</label>
           <label><input type="checkbox" id="pfPurpur" checked onchange="renderScenario()" /> purpur</label>
-          <label><input type="checkbox" id="scCrashGuard" checked onchange="renderScenario()" /> crash-guard: true (MCS001-MCS006, MCS012)</label>
+          <label><input type="checkbox" id="scCrashGuard" checked onchange="renderScenario()" /> crash-guard: true (MCS001-MCS006, MCS012, MCS015, MCS017)</label>
         </div>
 
         <div class="row">
@@ -397,6 +398,8 @@
           <span>Console Transcript Input (latest.log)</span>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn" onclick="loadLogSample('barrier')">Sample: Barrier Stall MCS012</button>
+            <button class="btn" onclick="loadLogSample('crashloop')">Sample: Folia Crash-Loop MCS015</button>
+            <button class="btn" onclick="loadLogSample('rcon')">Sample: RCON Fault MCS016/017</button>
             <button class="btn" onclick="loadLogSample('folia')">Sample: Folia MCS003</button>
             <button class="btn" onclick="loadLogSample('linkage')">Sample: Linkage MCS002</button>
             <button class="btn" onclick="loadLogSample('watchdog')">Sample: Watchdog MCS005</button>
@@ -423,7 +426,7 @@
 
       <div class="card">
         <h2>
-          <span>Crash &amp; Barrier Diagnostics (MCS001-MCS014) &amp; SARIF v2.1.0</span>
+          <span>Crash, Recovery &amp; RCON Diagnostics (MCS001-MCS017) &amp; SARIF v2.1.0</span>
           <button class="btn btn-primary" onclick="downloadSarif()">Download mcstage.sarif</button>
         </h2>
         <div id="simSummary" class="status-box status-ok"></div>
@@ -486,10 +489,83 @@
         <pre id="aggXmlOut" style="max-height:200px;"></pre>
       </div>
     </section>
+
+    <section id="rconSection" class="grid hidden">
+      <div class="card">
+        <h2>
+          <span>Deterministic Source RCON Fault Injector (MCS016-MCS017)</span>
+          <span class="badge">SplitMix64 + Wire Frame</span>
+        </h2>
+        <div class="row">
+          <div>
+            <label for="rconCmd">RCON Command Payload</label>
+            <input type="text" id="rconCmd" value="list" oninput="simulateRconFault()" />
+          </div>
+          <div>
+            <label for="rconIter">Iterations (1..50)</label>
+            <input type="number" id="rconIter" min="1" max="50" value="8" oninput="simulateRconFault()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="rconLat">Base Latency (ms)</label>
+            <input type="number" id="rconLat" min="0" max="2000" value="25" oninput="simulateRconFault()" />
+          </div>
+          <div>
+            <label for="rconJit">Jitter (ms)</label>
+            <input type="number" id="rconJit" min="0" max="2000" value="15" oninput="simulateRconFault()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="rconDrop">Packet Drop Rate (%)</label>
+            <input type="number" id="rconDrop" min="0" max="100" value="25" oninput="simulateRconFault()" />
+          </div>
+          <div>
+            <label for="rconCorrupt">Corrupt Frame Rate (%)</label>
+            <input type="number" id="rconCorrupt" min="0" max="100" value="10" oninput="simulateRconFault()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="rconRetries">Max Retries (0..10)</label>
+            <input type="number" id="rconRetries" min="0" max="10" value="4" oninput="simulateRconFault()" />
+          </div>
+          <div>
+            <label for="rconP95">Max p95 Budget (ms)</label>
+            <input type="number" id="rconP95" min="5" max="5000" value="350" oninput="simulateRconFault()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="rconTimeout">Attempt Timeout (ms)</label>
+            <input type="number" id="rconTimeout" min="5" max="5000" value="500" oninput="simulateRconFault()" />
+          </div>
+          <div>
+            <label for="rconSeed">PRNG Seed</label>
+            <input type="number" id="rconSeed" value="42" oninput="simulateRconFault()" />
+          </div>
+        </div>
+        <label>Encoded Source RCON Wire Frame (Little-Endian Hex)</label>
+        <pre id="rconWireOut" style="max-height:140px;"></pre>
+      </div>
+
+      <div class="card">
+        <h2>
+          <span>Simulated Attempt Trace &amp; Percentile Verdict</span>
+          <button class="btn" onclick="copyText('rconYamlOut')">Copy Step YAML</button>
+        </h2>
+        <div id="rconStatus" class="status-box status-ok"></div>
+        <label>Equivalent mcstage.yml Step</label>
+        <pre id="rconYamlOut" style="margin-bottom:12px; max-height:170px;"></pre>
+        <label>Per-Command Fault &amp; Retry Schedule</label>
+        <pre id="rconTraceOut" style="max-height:240px;"></pre>
+      </div>
+    </section>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.5.0. Runs 100% locally in your browser with zero network uploads.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.6.0. Runs 100% locally in your browser with zero network uploads.
   </footer>
 
   <script>
@@ -557,6 +633,38 @@
         shortDescription: "Server or Folia region tick lag spike or synchronous chunk load",
         help: "Inspect Spark or JFR tick profiles, replace synchronous chunk loads with async chunk tickets, and enforce budgets with no-barrier-stall.",
         regex: /Can't keep up!\s*Is the server overloaded\?\s*Running\s+\d+(?:\.\d+)?ms\s+or\s+\d+\s+ticks?\s+behind|Loaded chunk\s*\(-?\d+,\s*-?\d+\)\s*synchronously|\bsync-chunk-load\b|Ticking region[^\n]*?took\s+\d+(?:\.\d+)?ms/i
+      },
+      {
+        id: "MCS014",
+        name: "HeapUsageExceeded",
+        severity: "warning",
+        shortDescription: "JVM heap usage exceeded assert-heap threshold",
+        help: "Profile heap with Spark or VisualVM, check for plugin entity/cache leaks, and tune -Xmx.",
+        regex: /Heap:\s*\d+(?:\.\d+)?M\(\d+(?:\.\d+)?M\)\s*->\s*\d+(?:\.\d+)?M\(\d+(?:\.\d+)?M\)|Ahead-of-time GC:\s*used=\d+m\/\d+m/i
+      },
+      {
+        id: "MCS015",
+        name: "FoliaRegionalCrashLoop",
+        severity: "error",
+        shortDescription: "Folia regional tick crash-loop or unrecovered region fault",
+        help: "Guard per-region entity/block tick callbacks, register retired callbacks on EntityScheduler, and isolate faulty chunks.",
+        regex: /Region\s+crash[- ]loop\s+detected|Fatal\s+exception\s+ticking\s+region|(?:Exception|Error|Crash)\s+ticking\s+region\b|Failed\s+to\s+tick\s+region\b|Unhandled\s+regional\s+tick\s+exception\b/i
+      },
+      {
+        id: "MCS016",
+        name: "RconLatencyBudgetExceeded",
+        severity: "warning",
+        shortDescription: "RCON command round-trip or p95 latency exceeded budget",
+        help: "Offload blocking plugin commands from main/region threads and tune RCON socket timeouts.",
+        regex: /RCON\s+Client[^\n]*?\btimed\s+out\b|RCON\s+(?:command\s+)?latency[^\n]*?\bexceeded\b/i
+      },
+      {
+        id: "MCS017",
+        name: "RconPacketLossOrFrameDesync",
+        severity: "error",
+        shortDescription: "RCON packet loss exhausted retries or wire frame/auth desynchronized",
+        help: "Reconnect and re-authenticate RCON sockets on EOF or requestId=-1 and enforce 4096-byte payload bounds.",
+        regex: /Exception\s+in\s+RCON\b|RconThread[^\n]*?\b(?:terminated|crashed|corrupt|malformed|desync)\b|Corrupt\s+RCON\s+frame\b/i
       }
     ];
 
@@ -573,25 +681,27 @@
       document.getElementById("builderSection").classList.toggle("hidden", which !== "builder");
       document.getElementById("simSection").classList.toggle("hidden", which !== "sim");
       document.getElementById("labSection").classList.toggle("hidden", which !== "lab");
+      document.getElementById("rconSection").classList.toggle("hidden", which !== "rcon");
       document.getElementById("tabBuilderBtn").classList.toggle("active", which === "builder");
       document.getElementById("tabSimBtn").classList.toggle("active", which === "sim");
       document.getElementById("tabLabBtn").classList.toggle("active", which === "lab");
+      document.getElementById("tabRconBtn").classList.toggle("active", which === "rcon");
     }
 
     function loadPreset(kind) {
       if (kind === "folia") {
-        document.getElementById("scName").value = "folia multi-region merge-split barrier gate";
+        document.getElementById("scName").value = "folia region recovery and rcon resilience gate";
         document.getElementById("pfPaper").checked = true;
         document.getElementById("pfFolia").checked = true;
         document.getElementById("pfPurpur").checked = false;
         document.getElementById("scVersions").value = "latest, 26.3, 1.21.4";
         document.getElementById("scCrashGuard").checked = true;
         steps = [
-          { action: "enabled", value: "RegionPlugin", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "inject-lag", value: "2s", timeout: "", match: "", mode: "merge-split", regions: "4", spacing: "1024", probe: "" },
-          { action: "no-barrier-stall", value: "350ms", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "list" },
-          { action: "not-expect", value: "re:Thread failed main thread check|TickThread", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "file-not-exists", value: "crash-reports/latest.txt", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" }
+          { action: "enabled", value: "RegionPlugin", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "inject-lag", value: "2s", timeout: "", match: "", mode: "merge-split", regions: "4", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "no-barrier-stall", value: "350ms", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "list", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "assert-region-recovery", value: "2s", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "rcon-fault", value: "list", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" }
         ];
       } else {
         document.getElementById("scName").value = "warps survive a reload";
@@ -601,11 +711,11 @@
         document.getElementById("scVersions").value = "latest, 26.3, 1.21.4";
         document.getElementById("scCrashGuard").checked = true;
         steps = [
-          { action: "enabled", value: "Warps", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "send", value: "warp reload", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" },
-          { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" }
+          { action: "enabled", value: "Warps", timeout: "60s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "file-exists", value: "plugins/Warps/config.yml", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "send", value: "warp reload", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "expect", value: "re:reloaded \\d+ warps?", timeout: "", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" },
+          { action: "not-expect", value: "re:WARN|ERROR", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" }
         ];
       }
       renderStepsEditor();
@@ -613,7 +723,7 @@
     }
 
     function addStep() {
-      steps.push({ action: "no-barrier-stall", value: "400ms", timeout: "1s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "" });
+      steps.push({ action: "assert-region-recovery", value: "2s", timeout: "2s", match: "", mode: "disjoint", regions: "2", spacing: "1024", probe: "", heapPct: 80, maxFaults: 1, maxRecovery: "1500ms", dropRate: "20%", maxP95: "350ms" });
       renderStepsEditor();
       renderScenario();
     }
@@ -636,13 +746,14 @@
       const actions = [
         "enabled", "send", "expect", "not-expect",
         "file-exists", "file-not-exists", "file-contains",
-        "assert-heap", "inject-lag", "no-barrier-stall", "wait"
+        "assert-heap", "assert-region-recovery", "rcon-fault",
+        "inject-lag", "no-barrier-stall", "wait"
       ];
       steps.forEach((st, idx) => {
         const div = document.createElement("div");
         div.className = "step-item";
         const options = actions.map(a => `<option value="${a}" ${st.action === a ? "selected" : ""}>${a}</option>`).join("");
-        const showTimeout = st.action !== "send" && st.action !== "wait" && st.action !== "inject-lag";
+        const showTimeout = st.action !== "send" && st.action !== "wait" && st.action !== "inject-lag" && st.action !== "rcon-fault";
         let extras = "";
         if (st.action === "file-contains") {
           extras = `
@@ -651,8 +762,30 @@
               <input type="text" value="${escapeHtmlAttr(st.match || '')}" placeholder="substring or re:pattern" oninput="updateStep(${idx}, 'match', this.value)" />
             </div>`;
         } else if (st.action === "assert-heap") {
-        line = `  - assert-heap:\n      max-percent: ${st.heapPct||80}\n      window: ${st.timeout||"30s"}`;
-      } else if (st.action === "inject-lag") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">max-percent (0..100):</span>
+              <input type="number" min="0" max="100" value="${escapeHtmlAttr(st.heapPct || 80)}" oninput="updateStep(${idx}, 'heapPct', this.value)" />
+            </div>`;
+        } else if (st.action === "assert-region-recovery") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">max-faults / max-recovery:</span>
+              <div style="display:grid;grid-template-columns:100px 1fr;gap:6px;">
+                <input type="number" min="0" max="100" value="${escapeHtmlAttr(st.maxFaults ?? 1)}" oninput="updateStep(${idx}, 'maxFaults', this.value)" />
+                <input type="text" value="${escapeHtmlAttr(st.maxRecovery || '1500ms')}" placeholder="1500ms" oninput="updateStep(${idx}, 'maxRecovery', this.value)" />
+              </div>
+            </div>`;
+        } else if (st.action === "rcon-fault") {
+          extras = `
+            <div class="step-extra">
+              <span style="font-size:12px;color:var(--muted);text-align:right;">drop-rate / max-p95:</span>
+              <div style="display:grid;grid-template-columns:120px 1fr;gap:6px;">
+                <input type="text" value="${escapeHtmlAttr(st.dropRate || '20%')}" placeholder="20%" oninput="updateStep(${idx}, 'dropRate', this.value)" />
+                <input type="text" value="${escapeHtmlAttr(st.maxP95 || '350ms')}" placeholder="350ms" oninput="updateStep(${idx}, 'maxP95', this.value)" />
+              </div>
+            </div>`;
+        } else if (st.action === "inject-lag") {
           extras = `
             <div class="step-extra">
               <span style="font-size:12px;color:var(--muted);text-align:right;">mode / regions / spacing:</span>
@@ -665,8 +798,6 @@
                 <input type="number" value="${escapeHtmlAttr(st.spacing || '1024')}" step="256" title="spacing blocks" oninput="updateStep(${idx}, 'spacing', this.value)" />
               </div>
             </div>`;
-        } else if (st.action === "assert-heap") {
-          extra = `<label>max-percent <input type="number" min="0" max="100" value="${st.heapPct||80}" style="width:60px" onchange="updateStep(${idx},'heapPct',+this.value)" /></label>`;
         } else if (st.action === "no-barrier-stall") {
           extras = `
             <div class="step-extra">
@@ -689,8 +820,8 @@
 
     function placeholderFor(action) {
       if (action === "enabled") return "PluginName";
-      if (action === "send") return "console command";
-      if (action === "wait" || action === "inject-lag") return "duration (e.g. 2s)";
+      if (action === "send" || action === "rcon-fault") return "command (e.g. list)";
+      if (action === "wait" || action === "inject-lag" || action === "assert-region-recovery" || action === "assert-heap") return "window (e.g. 2s)";
       if (action === "no-barrier-stall") return "max-stall (e.g. 400ms)";
       if (action.startsWith("file-")) return "plugins/MyPlugin/config.yml";
       return "substring or re:pattern";
@@ -770,8 +901,17 @@
           if (!st.value.trim()) errors.push(`${at}: duration required.`);
           validateDuration(st.value, at, errors);
         } else if (st.action === "assert-heap") {
-        line = `  - assert-heap:\n      max-percent: ${st.heapPct||80}\n      window: ${st.timeout||"30s"}`;
-      } else if (st.action === "inject-lag") {
+          const pct = parseInt(st.heapPct || "80", 10);
+          if (isNaN(pct) || pct < 0 || pct > 100) errors.push(`${at}: max-percent must be 0..100.`);
+          if (st.value.trim()) validateDuration(st.value, `${at}.window`, errors);
+        } else if (st.action === "assert-region-recovery") {
+          if (!st.value.trim()) errors.push(`${at}: window duration required.`);
+          validateDuration(st.value, `${at}.window`, errors);
+          validateDuration(st.maxRecovery || "1500ms", `${at}.max-recovery`, errors);
+        } else if (st.action === "rcon-fault") {
+          if (!st.value.trim()) errors.push(`${at}: RCON command required.`);
+          validateDuration(st.maxP95 || "350ms", `${at}.max-p95`, errors);
+        } else if (st.action === "inject-lag") {
           if (!st.value.trim()) errors.push(`${at}: duration required.`);
           validateDuration(st.value, `${at}.duration`, errors);
           const regs = parseInt(st.regions || "2", 10);
@@ -779,8 +919,6 @@
           if (isNaN(regs) || regs < 1 || regs > 64) errors.push(`${at}: regions must be 1..64.`);
           if (st.mode === "merge-split" && regs < 2) errors.push(`${at}: merge-split requires at least 2 regions.`);
           if (isNaN(sp) || sp < 768) errors.push(`${at}: spacing must be >= 768 blocks (3 Folia 16-chunk sections).`);
-        } else if (st.action === "assert-heap") {
-          extra = `<label>max-percent <input type="number" min="0" max="100" value="${st.heapPct||80}" style="width:60px" onchange="updateStep(${idx},'heapPct',+this.value)" /></label>`;
         } else if (st.action === "no-barrier-stall") {
           if (!st.value.trim()) errors.push(`${at}: max-stall duration required.`);
           validateDuration(st.value, `${at}.max-stall`, errors);
@@ -842,6 +980,25 @@
           lines.push(`      spacing: ${parseInt(st.spacing || "1024", 10)}`);
           lines.push(`      duration: ${st.value.trim()}`);
           lines.push("      cadence: 250ms");
+        } else if (st.action === "assert-heap") {
+          lines.push("  - assert-heap:");
+          lines.push(`      max-percent: ${parseInt(st.heapPct || "80", 10)}`);
+          lines.push(`      window: ${(st.value || st.timeout || "30s").trim()}`);
+        } else if (st.action === "assert-region-recovery") {
+          lines.push("  - assert-region-recovery:");
+          lines.push(`      max-faults: ${parseInt(st.maxFaults ?? "1", 10)}`);
+          lines.push("      loop-window: 5s");
+          lines.push(`      max-recovery: ${(st.maxRecovery || "1500ms").trim()}`);
+          lines.push(`      window: ${(st.value || st.timeout || "2s").trim()}`);
+        } else if (st.action === "rcon-fault") {
+          lines.push("  - rcon-fault:");
+          lines.push(`      commands: [${JSON.stringify((st.value || "list").trim())}]`);
+          lines.push("      iterations: 6");
+          lines.push("      latency: 25ms");
+          lines.push(`      drop-rate: ${(st.dropRate || "20%").trim()}`);
+          lines.push("      max-retries: 4");
+          lines.push(`      max-p95: ${(st.maxP95 || "350ms").trim()}`);
+          lines.push("      seed: 42");
         } else if (st.action === "no-barrier-stall" && (st.probe || "").trim()) {
           lines.push("  - no-barrier-stall:");
           lines.push(`      max-stall: ${st.value.trim()}`);
@@ -880,7 +1037,7 @@
         "      - run: ./gradlew build --no-daemon",
         "",
         "      - name: Run Real-Server Matrix",
-        "        uses: SalyyS1/mcstage@v0.4.0",
+        "        uses: SalyyS1/mcstage@v0.6.0",
         "        with:",
         "          scenario: mcstage.yml",
         "          accept-eula: 'true'",
@@ -908,6 +1065,21 @@
           "[03:11:05 WARN]: Can't keep up! Is the server overloaded? Running 640ms or 12 ticks behind",
           "[03:11:06 ERROR]: [ThreadedRegionizer] Region merge barrier stalled waiting on chunk (48, 0)",
           "[03:11:07 INFO]: Stopping server"
+        ].join("\n"),
+        crashloop: [
+          "[04:01:00 INFO]: Starting minecraft server version 26.3",
+          "[04:01:03 INFO]: Done (2.810s)! For help, type \"help\"",
+          "[04:01:04 ERROR]: [Region Scheduler Thread #2/ERROR]: Exception ticking region chunk (32, -16)",
+          "[04:01:04 ERROR]: [Region Scheduler Thread #2/ERROR]: Exception ticking region chunk (33, -15)",
+          "[04:01:05 ERROR]: Region crash-loop detected on section(2,-1): aborting regional tick",
+          "[04:01:06 INFO]: Stopping server"
+        ].join("\n"),
+        rcon: [
+          "[04:05:00 INFO]: Starting minecraft server version 26.3",
+          "[04:05:03 INFO]: Done (2.750s)! For help, type \"help\"",
+          "[04:05:04 WARN]: RCON command latency 620ms exceeded max-p95 threshold on /list",
+          "[04:05:05 ERROR]: Corrupt RCON frame on 127.0.0.1:25575 (length=4 < 10)",
+          "[04:05:06 INFO]: Stopping server"
         ].join("\n"),
         folia: [
           "[03:14:01 INFO]: Starting minecraft server version 1.21.4",
@@ -1006,7 +1178,7 @@
             "tool": {
               "driver": {
                 "name": "mcstage",
-                "version": "0.4.0",
+                "version": "0.6.0",
                 "informationUri": "https://github.com/SalyyS1/mcstage",
                 "rules": RULES.map(r => ({
                   "id": r.id,
@@ -1275,11 +1447,147 @@
       return escapeHtml(s).replace(/"/g, "&quot;");
     }
 
+    function makeSplitMix64(seedNum) {
+      const mask = 0xFFFFFFFFFFFFFFFFn;
+      let state = BigInt(Math.trunc(seedNum || 0)) & mask;
+      return {
+        nextU64() {
+          state = (state + 0x9E3779B97F4A7C15n) & mask;
+          let z = state;
+          z = ((z ^ (z >> 30n)) * 0xBF58476D1CE4E5B9n) & mask;
+          z = ((z ^ (z >> 27n)) * 0x94D049BB133111EBn) & mask;
+          return (z ^ (z >> 31n)) & mask;
+        },
+        nextDouble() {
+          return Number(this.nextU64() >> 11n) / 9007199254740992;
+        },
+        nextMillis(boundInclusive) {
+          if (boundInclusive <= 0) return 0;
+          const span = BigInt(boundInclusive + 1);
+          const pos = this.nextU64() & 0x7FFFFFFFFFFFFFFFn;
+          return Number(pos % span);
+        }
+      };
+    }
+
+    function encodeRconHex(reqId, type, payload) {
+      const enc = new TextEncoder().encode(payload);
+      const len = 4 + 4 + enc.length + 2;
+      const buf = new ArrayBuffer(4 + len);
+      const view = new DataView(buf);
+      view.setInt32(0, len, true);
+      view.setInt32(4, reqId, true);
+      view.setInt32(8, type, true);
+      const bytes = new Uint8Array(buf);
+      bytes.set(enc, 12);
+      bytes[12 + enc.length] = 0;
+      bytes[13 + enc.length] = 0;
+      return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join(" ");
+    }
+
+    function simulateRconFault() {
+      const cmd = (document.getElementById("rconCmd").value || "list").trim() || "list";
+      const iterations = Math.min(50, Math.max(1, parseInt(document.getElementById("rconIter").value || "8", 10)));
+      const baseLat = Math.max(0, parseInt(document.getElementById("rconLat").value || "25", 10));
+      const jitter = Math.max(0, parseInt(document.getElementById("rconJit").value || "15", 10));
+      const dropPct = Math.min(100, Math.max(0, parseFloat(document.getElementById("rconDrop").value || "25")));
+      const corruptPct = Math.min(100, Math.max(0, parseFloat(document.getElementById("rconCorrupt").value || "10")));
+      const maxRetries = Math.min(10, Math.max(0, parseInt(document.getElementById("rconRetries").value || "4", 10)));
+      const maxP95 = Math.max(5, parseInt(document.getElementById("rconP95").value || "350", 10));
+      const attemptTimeout = Math.max(5, parseInt(document.getElementById("rconTimeout").value || "500", 10));
+      const seed = parseInt(document.getElementById("rconSeed").value || "42", 10) || 42;
+
+      document.getElementById("rconWireOut").textContent =
+        `SERVERDATA_EXECCOMMAND (reqId=101, type=2, payload=${JSON.stringify(cmd)}):\n` +
+        encodeRconHex(101, 2, cmd);
+
+      document.getElementById("rconYamlOut").textContent = [
+        "- rcon-fault:",
+        `    commands: [${JSON.stringify(cmd)}]`,
+        `    iterations: ${iterations}`,
+        `    latency: ${baseLat}ms`,
+        `    jitter: ${jitter}ms`,
+        `    drop-rate: ${dropPct}%`,
+        `    corrupt-rate: ${(corruptPct / 100).toFixed(2)}`,
+        `    max-retries: ${maxRetries}`,
+        `    attempt-timeout: ${attemptTimeout}ms`,
+        `    max-p95: ${maxP95}ms`,
+        `    seed: ${seed}`
+      ].join("\n");
+
+      const rng = makeSplitMix64(seed);
+      const rtts = [];
+      const trace = [];
+      let totalAttempts = 0, drops = 0, corrupts = 0, retries = 0;
+      let failure = null;
+
+      for (let i = 0; i < iterations; i++) {
+        let elapsed = 0;
+        let done = false;
+        let lastReason = "";
+        for (let att = 0; att <= maxRetries; att++) {
+          if (att > 0) {
+            retries++;
+            elapsed += 20;
+          }
+          totalAttempts++;
+          const d = baseLat + rng.nextMillis(jitter);
+          if (d > attemptTimeout) {
+            elapsed += attemptTimeout;
+            lastReason = "MCS016_TIMEOUT";
+            trace.push(`cmd#${i + 1} attempt ${att + 1}: TIMEOUT (${d}ms > ${attemptTimeout}ms)`);
+            continue;
+          }
+          elapsed += d;
+          if (dropPct > 0 && rng.nextDouble() < dropPct / 100) {
+            drops++;
+            lastReason = "MCS017_DROP";
+            trace.push(`cmd#${i + 1} attempt ${att + 1}: PACKET_DROP (+${d}ms)`);
+            continue;
+          }
+          if (corruptPct > 0 && rng.nextDouble() < corruptPct / 100) {
+            corrupts++;
+            lastReason = "MCS017_CORRUPT";
+            trace.push(`cmd#${i + 1} attempt ${att + 1}: CORRUPT_FRAME (+${d}ms, reconnect + re-auth)`);
+            continue;
+          }
+          rtts.push(elapsed);
+          trace.push(`cmd#${i + 1} attempt ${att + 1}: OK (cmd RTT=${elapsed}ms)`);
+          done = true;
+          break;
+        }
+        if (!done) {
+          const rule = lastReason.startsWith("MCS016") ? "MCS016" : "MCS017";
+          failure = `[${rule}] cmd#${i + 1} failed (${lastReason}) after ${maxRetries + 1} attempt(s)`;
+          break;
+        }
+      }
+
+      const sorted = [...rtts].sort((a, b) => a - b);
+      const pct = (q) => sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))];
+      const p50 = pct(0.50);
+      const p95 = pct(0.95);
+      if (!failure && p95 > maxP95) {
+        failure = `[MCS016] RCON p95 latency ${p95}ms exceeded max-p95 ${maxP95}ms`;
+      }
+
+      const stBox = document.getElementById("rconStatus");
+      if (!failure) {
+        stBox.className = "status-box status-ok";
+        stBox.textContent = `PASS: ${rtts.length}/${iterations} RCON cmd(s) ok (${totalAttempts} attempts, ${drops} drops, ${corrupts} corrupt, ${retries} retries, p50=${p50}ms, p95=${p95}ms <= ${maxP95}ms)`;
+      } else {
+        stBox.className = "status-box status-err";
+        stBox.textContent = `FAIL: ${failure} (${drops} drops, ${corrupts} corrupt, p95=${p95}ms)`;
+      }
+      document.getElementById("rconTraceOut").textContent = trace.join("\n");
+    }
+
     renderStepsEditor();
     renderScenario();
     loadLogSample("barrier");
     renderTopology();
     loadSampleJunit();
+    simulateRconFault();
   </script>
 </body>
 </html>

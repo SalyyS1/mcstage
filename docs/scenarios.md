@@ -13,6 +13,7 @@ ignored, so a mistyped `timout:` stops immediately instead of doing nothing.
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `name` | the file name | What the report calls this scenario. |
+| `extends` | none | Optional relative path to a base YAML scenario whose plugins, properties, jvm-args, and forbid entries are inherited. |
 | `platforms` / `platform` | `paper` | Any of `paper`, `folia`, `purpur`. A single string is fine. |
 | `versions` / `version` | `latest` | Exact versions, a family such as `1.21` or `26.3`, or `latest`. |
 | `allow-prerelease` | `false` | Let `latest` and a family resolve to a release candidate. |
@@ -26,7 +27,7 @@ ignored, so a mistyped `timout:` stops immediately instead of doing nothing.
 | `stop` | `stop` | The console command that shuts the server down. |
 | `stop-timeout` | `60s` | How long to wait after asking, before killing it and reporting that. |
 | `forbid` | none | Lines that must not appear, checked against every line for the whole run. |
-| `crash-guard` | `false` | Fail the case automatically if any fatal server/plugin crash or barrier signature (`MCS001`-`MCS006`, `MCS012`) is detected in console output or `crash-reports/`. |
+| `crash-guard` | `false` | Fail the case automatically if any fatal server/plugin crash, barrier, Folia crash-loop, or RCON wire signature (`MCS001`-`MCS006`, `MCS012`, `MCS015`, `MCS017`) is detected in console output or `crash-reports/`. |
 | `timeout` | `60s` | The default timeout for a step that does not give its own. |
 | `steps` | required | What to do once the server is ready. |
 
@@ -73,6 +74,24 @@ steps:
       max-stall: 400ms
       probe-command: "list"
     timeout: 2s
+  - assert-heap:                         # assert JVM GC peak heap usage stays <= max-percent
+      max-percent: 80
+      window: 5s
+  - assert-region-recovery:              # assert Folia regional fault isolation and recovery within budget
+      max-faults: 1
+      loop-window: 5s
+      max-recovery: 1500ms
+      window: 2s
+  - rcon-fault:                          # deterministic Source RCON latency, packet-loss, and frame fault injection
+      commands: ["list", "tps"]
+      iterations: 6
+      latency: 25ms
+      jitter: 15ms
+      drop-rate: 20%
+      corrupt-rate: 0.0
+      max-retries: 4
+      max-p95: 350ms
+      seed: 42
   - send: "warp reload"
   - not-expect: "re:WARN|ERROR"          # assert no matching console line appears during the window
     timeout: 2s
@@ -87,8 +106,11 @@ steps:
 - `not-expect` drains live server output for `timeout` (`2s` when omitted) and fails immediately if any console line matches.
 - `file-exists`, `file-not-exists`, and `file-contains` inspect a relative path confined inside the server instance directory while continuing to drain live server logs and enforce `forbid` rules. Paths containing `..` or absolute roots are rejected at validation time.
 - `wait` drains server logs for the given duration so forbidden lines or unexpected exits during background tasks are caught.
+- `assert-heap` watches unified JVM GC (`-Xlog:gc` / `-verbose:gc`) and Paper watchdog heap lines across `window` and fails with `MCS014` if peak heap usage exceeds `max-percent` (`0..100`).
+- `assert-region-recovery` maps Folia regional tick faults to 16-chunk `ThreadedRegionizer` sections, fails with `MCS015` if any region faults more than `max-faults` times within `loop-window`, and verifies that faulted regions confirm recovery within `max-recovery` (supports optional `fault-command`, `recovery-expect`, `probe-command`, and `require-recovery`).
+- `rcon-fault` dispatches real binary Source RCON wire frames (`SERVERDATA_AUTH` and `SERVERDATA_EXECCOMMAND`) over loopback TCP sockets (either to an explicit `port` or an automatic loopback RCON bridge bound to the test server) while injecting deterministic `SplitMix64`-seeded `latency`, `jitter`, `drop-rate`, and `corrupt-rate` faults. Fails with `MCS016` when `attempt-timeout` or `max-p95` is breached, and with `MCS017` when retries (`max-retries`) are exhausted or authentication/frame framing fails.
 
-## Crash Diagnostics (`MCS001` - `MCS013`) and Reports (`console`, `json`, `junit`, `sarif`)
+## Crash Diagnostics (`MCS001` - `MCS017`) and Reports (`console`, `json`, `junit`, `sarif`)
 
 Every matrix case is inspected by `CrashAnalyzer`, which classifies console output and newly written `crash-reports/crash-*.txt` files into rule IDs:
 
@@ -101,6 +123,10 @@ Every matrix case is inspected by `CrashAnalyzer`, which classifies console outp
 - `MCS007` - `MCS011`: Boot timeout/exit (`MCS007`), step failure (`MCS008`), `forbid` match (`MCS009`), hung shutdown (`MCS010`), and setup/EULA error (`MCS011`).
 - `MCS012`: Folia `ThreadedRegionizer` merge/split barrier stall, Moonrise `ChunkTaskScheduler` / `ChunkHolderManager` deadlock, or `no-barrier-stall` violation (fatal when `crash-guard: true`).
 - `MCS013`: Server or Folia regional tick lag spike (`Running Xms behind`, `Ticking region took Xms`) or synchronous chunk load on a tick thread.
+- `MCS014`: Peak JVM heap usage exceeded the `assert-heap` threshold.
+- `MCS015`: Folia regional tick crash-loop (`>= 3` faults in a single 16-chunk section within 10s, or `assert-region-recovery` breach; fatal when `crash-guard: true`).
+- `MCS016`: RCON command round-trip timeout or `max-p95` latency budget exceeded.
+- `MCS017`: RCON packet-loss retry exhaustion, authentication rejection (`requestId = -1`), or binary frame corruption/desync (fatal when `crash-guard: true`).
 
 `--format` selects `console` (default), `json` (structured CI JSON), `junit` (standard JUnit XML `<testsuites>`), or `sarif` (OASIS SARIF v2.1.0). Passing `--sarif <path>` writes a SARIF v2.1.0 report alongside any primary `--format` in a single server run.
 

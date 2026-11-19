@@ -4,12 +4,13 @@
 [![Release](https://img.shields.io/github/v/release/SalyyS1/mcstage)](https://github.com/SalyyS1/mcstage/releases)
 
 `mcstage` boots real Minecraft servers (`paper`, `folia`, `purpur`), installs your built plugin `.jar`, drives
-commands and Folia multi-region synthetic lag workloads over the server console, asserts on live log lines, chunk/region
-barrier stall budgets, quiet windows, crash signatures, and generated plugin files, and emits human, JSON, JUnit XML,
-Markdown CI summaries, or OASIS SARIF v2.1.0 reports. It downloads official server builds, verifies publisher digests
-(`SHA-256` / `MD5`) on both cache write and cache read, and reuses cached jars and worlds across runs:
+commands, Folia multi-region synthetic lag workloads, and deterministic Source RCON fault profiles, asserts on live
+log lines, Folia regional crash-loop recovery (`assert-region-recovery`), chunk/region barrier stall budgets, JVM heap
+thresholds (`assert-heap`), quiet windows, crash signatures, and generated plugin files, and emits human, JSON, JUnit
+XML, Markdown CI summaries, or OASIS SARIF v2.1.0 reports. It downloads official server builds, verifies publisher
+digests (`SHA-256` / `MD5`) on both cache write and cache read, and reuses cached jars and worlds across runs:
 
-- **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Barrier Topology & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice planner, `MCS001`-`MCS013` crash/barrier log analyzer, and multi-file JUnit XML aggregator).
+- **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Recovery, RCON Fault & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice & crash-loop recovery planner, deterministic SplitMix64 RCON latency/drop simulator, `MCS001`-`MCS017` crash/barrier log analyzer, and multi-file JUnit XML aggregator).
 
 ```
 $ mcstage test mcstage.yml --accept-eula --sarif build/reports/mcstage.sarif
@@ -46,13 +47,13 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.4.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.6.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.4.0.jar init                          # generates starter mcstage.yml
-java -jar mcstage-0.4.0.jar validate mcstage.yml          # offline schema, Folia spacing, regex, matrix, and Java check
-java -jar mcstage-0.4.0.jar test mcstage.yml --accept-eula --format junit -o build/reports/mcstage.xml --sarif mcstage.sarif
-java -jar mcstage-0.4.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.6.0.jar init                          # generates starter mcstage.yml
+java -jar mcstage-0.6.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, regex, matrix, and Java check
+java -jar mcstage-0.6.0.jar test mcstage.yml --accept-eula --format junit -o build/reports/mcstage.xml --sarif mcstage.sarif
+java -jar mcstage-0.6.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
 ```
 
 ## Writing a Scenario (`mcstage.yml`)
@@ -90,6 +91,20 @@ steps:
       max-stall: 400ms
       probe-command: "list"
     timeout: 2s
+  - assert-region-recovery:
+      max-faults: 1
+      loop-window: 5s
+      max-recovery: 1500ms
+      window: 2s
+  - rcon-fault:
+      commands: ["list", "tps"]
+      iterations: 6
+      latency: 25ms
+      jitter: 15ms
+      drop-rate: 20%
+      max-retries: 4
+      max-p95: 350ms
+      seed: 42
   - send: "warp reload"
   - expect: re:reloaded \d+ warps?
   - not-expect: "re:WARN|ERROR"
@@ -97,9 +112,9 @@ steps:
   - file-not-exists: "plugins/Warps/corrupt.bak"
 ```
 
-Three platforms across three versions expands to a 9-server matrix run sequentially. Every key, crash rule (`MCS001`-`MCS013`),
+Three platforms across three versions expands to a 9-server matrix run sequentially. Every key, crash rule (`MCS001`-`MCS017`),
 and step type (`expect`, `not-expect`, `send`, `wait`, `enabled`, `file-exists`, `file-not-exists`, `file-contains`,
-`inject-lag`, `no-barrier-stall`) is documented in [`docs/scenarios.md`](docs/scenarios.md).
+`inject-lag`, `no-barrier-stall`, `assert-heap`, `assert-region-recovery`, `rcon-fault`) is documented in [`docs/scenarios.md`](docs/scenarios.md).
 
 ## CLI Commands
 
@@ -125,7 +140,9 @@ mcstage run dev --plugin build/libs/warps-1.4.jar --attach
 
 - **Folia `ThreadedRegionizer` Multi-Region Synthetic Lag Injection (`inject-lag`):** Places `N` anchor coordinates on a 2D lattice spaced at least `768` blocks (`3` Folia 16-chunk sections, respecting `emptySectionCreateRadius = 1` + `regionSectionMergeRadius = 1`) so anchors tick on guaranteed disjoint region threads in `disjoint` mode, or alternates minimal spanning-tree 256-block stepping-stone tickets in `merge-split` mode to force deterministic region merge and split barriers.
 - **Chunk & Region Barrier Stall Assertions (`no-barrier-stall`):** Enforces millisecond stall budgets (`max-stall`) across Moonrise `ChunkTaskScheduler` / Folia `ThreadedRegionizer` barrier signatures, synchronous tick-thread chunk loads, `Running Xms behind` spikes, and optional active console barrier round-trip probes (`probe-command`).
-- **Structured Crash & Barrier Classifier (`MCS001`-`MCS013`):** Inspects live server console output and newly written `crash-reports/crash-*.txt` files for plugin load/dependency failures (`MCS001`), `onEnable` or JVM bytecode linkage errors (`MCS002`), Folia region-thread violations (`MCS003`), unhandled event/command exceptions (`MCS004`), Watchdog stalls / `OutOfMemoryError` (`MCS005`), saved crash reports (`MCS006`), Folia/Moonrise chunk or region barrier deadlocks (`MCS012`), and tick lag spikes (`MCS013`). Setting `crash-guard: true` fails the case automatically whenever `MCS001`-`MCS006` or `MCS012` triggers.
+- **Folia Regional Crash-Loop & Recovery Assertions (`assert-region-recovery` / `MCS015`):** Maps chunk and section fault coordinates onto Folia's 16-chunk `ThreadedRegionizer` sections, enforces sliding-window per-region fault caps (`max-faults` over `loop-window`), and verifies post-fault regional recovery within `max-recovery`.
+- **Deterministic Source RCON Fault Injection (`rcon-fault` / `MCS016`-`MCS017`):** Speaks real little-endian binary Source RCON wire packets (`SERVERDATA_AUTH` / `SERVERDATA_EXECCOMMAND`) over loopback TCP sockets while injecting reproducible `SplitMix64`-seeded latency, jitter, packet drops, and corrupt wire frames to verify retry recovery (`MCS017`) and `max-p95` latency budgets (`MCS016`).
+- **Structured Crash & Barrier Classifier (`MCS001`-`MCS017`):** Inspects live server console output and newly written `crash-reports/crash-*.txt` files for plugin load/dependency failures (`MCS001`), `onEnable` or JVM bytecode linkage errors (`MCS002`), Folia region-thread violations (`MCS003`), unhandled event/command exceptions (`MCS004`), Watchdog stalls / `OutOfMemoryError` (`MCS005`), saved crash reports (`MCS006`), Folia/Moonrise chunk or region barrier deadlocks (`MCS012`), tick lag spikes (`MCS013`), JVM heap peak breaches (`MCS014`), Folia regional crash loops (`MCS015`), RCON latency budget breaches (`MCS016`), and RCON packet-loss/frame-desync failures (`MCS017`). Setting `crash-guard: true` fails the case automatically whenever `MCS001`-`MCS006`, `MCS012`, `MCS015`, or `MCS017` triggers.
 - **XXE-Hardened JUnit XML Aggregation (`mcstage aggregate`):** Consolidates sharded matrix `<testsuites>` and Gradle/Surefire `<testsuite>` XML reports across files, directories, and globs while automatically excluding the `-o` destination file and disabling external XML entities.
 - **Explicit EULA Agreement & Loopback Isolation:** `mcstage` never sets `-Dcom.mojang.eula.agree=true` behind your back (`--accept-eula` is required), binds test servers strictly to `127.0.0.1` with automatic free-port probing, re-verifies `SHA-256` / `MD5` digests on every cache read, and confines filesystem assertions strictly inside the instance directory.
 
@@ -139,7 +156,7 @@ mcstage run dev --plugin build/libs/warps-1.4.jar --attach
 
 ## GitHub Actions Integration (`action.yml` + JUnit XML Aggregation + SARIF v2.1.0)
 
-Use the composite action `SalyyS1/mcstage@v0.4.0` to emit JUnit XML test reports, `$GITHUB_STEP_SUMMARY` Markdown tables, and OASIS SARIF v2.1.0 Code Scanning alerts from a single server run:
+Use the composite action `SalyyS1/mcstage@v0.6.0` to emit JUnit XML test reports, `$GITHUB_STEP_SUMMARY` Markdown tables, and OASIS SARIF v2.1.0 Code Scanning alerts from a single server run:
 
 ```yaml
 name: integration
@@ -161,7 +178,7 @@ jobs:
       - run: ./gradlew build --no-daemon
 
       - name: Run Real-Server Matrix
-        uses: SalyyS1/mcstage@v0.4.0
+        uses: SalyyS1/mcstage@v0.6.0
         with:
           scenario: mcstage.yml
           accept-eula: 'true'

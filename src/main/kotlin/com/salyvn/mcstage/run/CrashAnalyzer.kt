@@ -165,6 +165,33 @@ object CrashAnalyzer {
             help = "Profile heap with Spark /sparkm heap or VisualVM, check for plugin entity/cache leaks, and increase -Xmx if usage is expected.",
             fatalForCrashGuard = false,
         ),
+        DiagnosticRule(
+            id = "MCS015",
+            name = "FoliaRegionalCrashLoop",
+            defaultSeverity = "error",
+            shortDescription = "Folia regional tick crash-loop or unrecovered region fault",
+            fullDescription = "A Folia region thread repeatedly threw unhandled tick exceptions within a short window or failed to recover regional ticking within max-recovery.",
+            help = "Guard per-region entity/block tick callbacks, register retired callbacks on EntityScheduler, and isolate faulty chunks instead of re-queueing failing tasks on every tick.",
+            fatalForCrashGuard = true,
+        ),
+        DiagnosticRule(
+            id = "MCS016",
+            name = "RconLatencyBudgetExceeded",
+            defaultSeverity = "warning",
+            shortDescription = "RCON command round-trip or p95 latency exceeded budget",
+            fullDescription = "Source RCON command execution timed out or exceeded the configured max-p95 latency threshold under simulated or live network conditions.",
+            help = "Offload blocking plugin commands from main/region threads, tune RCON socket read timeouts, and avoid stalling RconThread command dispatch.",
+            fatalForCrashGuard = false,
+        ),
+        DiagnosticRule(
+            id = "MCS017",
+            name = "RconPacketLossOrFrameDesync",
+            defaultSeverity = "error",
+            shortDescription = "RCON packet loss exhausted retries or wire frame/auth desynchronized",
+            fullDescription = "An RCON session exhausted configured retries due to packet drops, encountered malformed/truncated binary frames, or lost request-ID/authentication synchronization.",
+            help = "Reconnect and re-authenticate RCON sockets on EOF or negative requestId (-1), enforce 4096-byte client payload bounds, and validate response request IDs.",
+            fatalForCrashGuard = true,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }
@@ -230,6 +257,27 @@ object CrashAnalyzer {
             ),
             summary = { line -> "Region tick lag spike or sync chunk load: ${line.trim()}" },
         ),
+        LogSignature(
+            ruleId = "MCS015",
+            regex = FoliaCrashRecoveryAnalyzer.HARD_CRASH_LOOP_REGEX,
+            summary = { line -> "Folia regional crash-loop: ${line.trim()}" },
+        ),
+        LogSignature(
+            ruleId = "MCS016",
+            regex = Regex(
+                """RCON\s+Client[^\n]*?\btimed\s+out\b|RCON\s+(?:command\s+)?latency[^\n]*?\bexceeded\b""",
+                RegexOption.IGNORE_CASE,
+            ),
+            summary = { line -> "RCON latency spike or client timeout: ${line.trim()}" },
+        ),
+        LogSignature(
+            ruleId = "MCS017",
+            regex = Regex(
+                """Exception\s+in\s+RCON\b|RconThread[^\n]*?\b(?:terminated|crashed|corrupt|malformed|desync)\b|Corrupt\s+RCON\s+frame\b""",
+                RegexOption.IGNORE_CASE,
+            ),
+            summary = { line -> "RCON wire frame or listener fault: ${line.trim()}" },
+        ),
     )
 
     private const val MAX_FINDINGS_PER_RULE = 5
@@ -272,6 +320,19 @@ object CrashAnalyzer {
                     perRuleCount[sig.ruleId] = count + 1
                     break
                 }
+            }
+        }
+
+        if (perRuleCount.getOrDefault("MCS015", 0) == 0) {
+            FoliaCrashRecoveryAnalyzer.detectPassiveCrashLoop(transcript)?.let { loopViolation ->
+                findings += DiagnosticFinding(
+                    ruleId = "MCS015",
+                    severity = "error",
+                    message = loopViolation.message,
+                    lineNumber = loopViolation.lineNumber,
+                    matchedLine = loopViolation.matchedLine,
+                )
+                perRuleCount["MCS015"] = 1
             }
         }
 

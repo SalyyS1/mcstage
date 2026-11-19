@@ -3,6 +3,7 @@ package com.salyvn.mcstage.run
 import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.Platform
 import com.salyvn.mcstage.core.SetupError
+import com.salyvn.mcstage.rcon.RconFaultProfile
 import java.nio.file.Path
 import java.time.Duration
 
@@ -131,6 +132,38 @@ sealed interface Step {
     ) : Step {
         override val describe: String
             get() = "assert heap usage <= $maxPercent% for ${Durations.format(window)}"
+    }
+
+    /**
+     * Asserts that Folia regional tick threads isolate faults without entering a regional crash-loop
+     * (`> maxFaults` in the same region within `loopWindow`) and recover within `maxRecovery` (`MCS015`).
+     */
+    data class AssertRegionRecovery(
+        val maxFaults: Int = 1,
+        val loopWindow: Duration = Duration.ofSeconds(5),
+        val maxRecovery: Duration = Duration.ofSeconds(2),
+        val window: Duration = Duration.ofSeconds(1),
+        val requireRecovery: Boolean = true,
+        val faultCommand: String? = null,
+        val recoveryExpect: LineMatcher? = null,
+        val probeCommand: String? = null,
+    ) : Step {
+        override val describe: String
+            get() = "assert Folia region recovery (max-faults <= $maxFaults, recovery <= ${Durations.format(maxRecovery)}) for ${Durations.format(window)}"
+    }
+
+    /**
+     * Exercises Source RCON wire framing under deterministic latency, jitter, packet loss, and frame-corruption
+     * fault injection while enforcing retry recovery (`MCS017`) and p95 latency budgets (`MCS016`).
+     */
+    data class RconFault(
+        val profile: RconFaultProfile,
+    ) : Step {
+        override val describe: String
+            get() {
+                val dropPct = (profile.dropRate * 100.0).toInt()
+                return "inject RCON fault (${profile.iterations} cmd(s), latency=${Durations.format(profile.baseLatency)}, drop=$dropPct%, max-p95=${Durations.format(profile.maxP95Latency)})"
+            }
     }
 }
 
