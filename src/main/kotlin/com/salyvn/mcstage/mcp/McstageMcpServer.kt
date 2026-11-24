@@ -128,6 +128,7 @@ class McstageMcpServer {
                 "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
                 "mcstage_render_step_summary" -> toolRenderStepSummary(args)
+                "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -550,6 +551,63 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportWorldSarif(args: JsonObject): JsonObject {
+        val worldDir = args["world_dir"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'world_dir' string.")
+        val requireUnlocked = args["require_session_lock_cleared"]?.jsonPrimitive?.booleanOrNull ?: false
+        val report = com.salyvn.mcstage.run.WorldIntegrityChecker.inspect(
+            java.nio.file.Path.of(worldDir),
+            requireSessionLockCleared = requireUnlocked,
+        )
+        val sarifDoc = buildJsonObject {
+            put("\$schema", "https://json.schemastore.org/sarif-2.1.0.json")
+            put("version", "2.1.0")
+            putJsonArray("runs") {
+                add(buildJsonObject {
+                    putJsonObject("tool") {
+                        putJsonObject("driver") {
+                            put("name", BuildInfo.NAME)
+                            put("version", BuildInfo.version)
+                            putJsonArray("rules") {
+                                add(buildJsonObject {
+                                    put("id", "MCS021")
+                                    put("name", "WorldAnvilIntegrityViolation")
+                                    putJsonObject("shortDescription") {
+                                        put("text", "Minecraft world level.dat, session.lock, or Anvil .mca corruption")
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    putJsonArray("results") {
+                        for (iss in report.issues) {
+                            add(buildJsonObject {
+                                put("ruleId", "MCS021")
+                                put("level", "error")
+                                putJsonObject("message") { put("text", "${iss.code}: ${iss.message}") }
+                                putJsonArray("locations") {
+                                    add(buildJsonObject {
+                                        putJsonObject("physicalLocation") {
+                                            putJsonObject("artifactLocation") {
+                                                put("uri", iss.path.replace('\\', '/'))
+                                            }
+                                        }
+                                    })
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+        }
+        return buildJsonObject {
+            put("ok", report.ok)
+            put("world_dir", report.worldDir)
+            put("issue_count", report.issues.size)
+            put("sarif", sarifDoc)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -582,6 +640,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
         add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
+        add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -657,6 +716,10 @@ class McstageMcpServer {
                     }
                     "mcstage_render_step_summary" -> {
                         putJsonObject("report_json") { put("type", "string") }
+                    }
+                    "mcstage_export_world_sarif" -> {
+                        putJsonObject("world_dir") { put("type", "string") }
+                        putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
                     }
                 }
             }
