@@ -130,6 +130,7 @@ class McstageMcpServer {
                 "mcstage_render_step_summary" -> toolRenderStepSummary(args)
                 "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
+                "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -670,6 +671,63 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportJarSarif(args: JsonObject): JsonObject {
+        val jarPath = args["jar_path"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { null }
+            ?: throw IllegalArgumentException("Missing required 'jar_path' string.")
+        val targetFolia = args["target_folia"]?.jsonPrimitive?.booleanOrNull ?: false
+        val report = com.salyvn.mcstage.instance.PluginJarInspector.inspect(
+            java.nio.file.Path.of(jarPath),
+            targetFolia = targetFolia,
+        )
+        val sarifDoc = buildJsonObject {
+            put("\$schema", "https://json.schemastore.org/sarif-2.1.0.json")
+            put("version", "2.1.0")
+            putJsonArray("runs") {
+                add(buildJsonObject {
+                    putJsonObject("tool") {
+                        putJsonObject("driver") {
+                            put("name", BuildInfo.NAME)
+                            put("version", BuildInfo.version)
+                            putJsonArray("rules") {
+                                add(buildJsonObject {
+                                    put("id", "MCS023")
+                                    put("name", "PluginJarManifestOrBytecodeViolation")
+                                    putJsonObject("shortDescription") {
+                                        put("text", "Minecraft plugin JAR manifest, main class, Java bytecode, or Folia readiness defect")
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    putJsonArray("results") {
+                        for (iss in report.issues) {
+                            add(buildJsonObject {
+                                put("ruleId", iss.ruleId)
+                                put("level", if (iss.severity.equals("error", ignoreCase = true) || iss.severity.equals("critical", ignoreCase = true)) "error" else "warning")
+                                putJsonObject("message") { put("text", "[${iss.code}] ${iss.message}") }
+                                putJsonArray("locations") {
+                                    add(buildJsonObject {
+                                        putJsonObject("physicalLocation") {
+                                            putJsonObject("artifactLocation") {
+                                                put("uri", report.jarPath.replace('\\', '/'))
+                                            }
+                                        }
+                                    })
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+        }
+        return buildJsonObject {
+            put("ok", report.ok)
+            put("jar_path", report.jarPath)
+            put("issue_count", report.issues.size)
+            put("sarif", sarifDoc)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -704,6 +762,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
         add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
+        add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -788,6 +847,10 @@ class McstageMcpServer {
                         putJsonObject("server_properties") { put("type", "string") }
                         putJsonObject("server_dir") { put("type", "string") }
                         putJsonObject("jvm_flags") { put("type", "array") }
+                    }
+                    "mcstage_export_jar_sarif" -> {
+                        putJsonObject("jar_path") { put("type", "string") }
+                        putJsonObject("target_folia") { put("type", "boolean") }
                     }
                 }
             }
