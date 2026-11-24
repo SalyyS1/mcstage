@@ -67,6 +67,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_export_jar_sarif",
                 "mcstage_export_doctor_badge",
                 "mcstage_export_doctor_html",
+                "mcstage_export_folia_topology_html",
                 "mcstage_export_summary_badge",
                 "mcstage_list_rules",
             ),

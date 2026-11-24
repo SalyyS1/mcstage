@@ -174,4 +174,59 @@ object FoliaRegionTopology {
             }
         }
     }
+
+    /** Render a self-contained dark-mode HTML report with an SVG Folia ThreadedRegionizer 16-chunk section grid. */
+    fun renderTopologyHtml(
+        nodes: List<RegionNode>,
+        mode: Mode,
+        spacingBlocks: Int,
+    ): String {
+        val maxCol = nodes.maxOfOrNull { it.col } ?: 0
+        val maxRow = nodes.maxOfOrNull { it.row } ?: 0
+        val cell = 92
+        val pad = 48
+        val svgW = (maxCol + 1) * cell + pad * 2
+        val svgH = (maxRow + 1) * cell + pad * 2
+        val svgElements = StringBuilder()
+        if (mode == Mode.MERGE_SPLIT) {
+            for (i in 0 until nodes.size) {
+                for (j in i + 1 until nodes.size) {
+                    val a = nodes[i]
+                    val b = nodes[j]
+                    if (abs(a.row - b.row) + abs(a.col - b.col) == 1) {
+                        val x1 = pad + a.col * cell + cell / 2
+                        val y1 = pad + a.row * cell + cell / 2
+                        val x2 = pad + b.col * cell + cell / 2
+                        val y2 = pad + b.row * cell + cell / 2
+                        svgElements.append("""<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,4"/>""")
+                    }
+                }
+            }
+        }
+        val rowsHtml = StringBuilder()
+        for (n in nodes) {
+            val cx = pad + n.col * cell + cell / 2
+            val cy = pad + n.row * cell + cell / 2
+            svgElements.append("""<rect x="${cx - 32}" y="${cy - 32}" width="64" height="64" rx="8" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-dasharray="3,3"/>""")
+            svgElements.append("""<circle cx="$cx" cy="$cy" r="14" fill="#22c55e" stroke="#0b0f17" stroke-width="2"/>""")
+            svgElements.append("""<text x="$cx" y="${cy + 4}" text-anchor="middle" fill="#0b0f17" font-size="11" font-weight="bold">R${n.index}</text>""")
+            rowsHtml.append(
+                "<tr><td><b>R${n.index}</b></td><td>(${n.blockX}, ${n.blockZ})</td><td>(${n.chunkX}, ${n.chunkZ})</td><td>(${n.sectionX}, ${n.sectionZ})</td></tr>\n",
+            )
+        }
+        val minSectionStep = spacingBlocks / SECTION_BLOCK_SIZE
+        val disjointOk = minSectionStep >= MIN_DISJOINT_SECTION_DISTANCE
+        return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>mcstage Folia Region Topology (${nodes.size} regions)</title>
+<style>
+body{margin:0;padding:28px;background:#0b0f17;color:#e6edf7;font-family:system-ui,sans-serif}
+.wrap{max-width:960px;margin:0 auto}.card{background:#121826;border:1px solid #26324d;border-radius:10px;padding:18px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #1e293b;text-align:left}
+th{color:#93a4c3}code{font-family:ui-monospace,monospace;color:#38bdf8}
+</style></head><body><div class="wrap">
+<div class="card"><h1>Folia ThreadedRegionizer 16-Chunk Section Topology</h1>
+<p>Regions: <b>${nodes.size}</b> &middot; Mode: <code>${mode.id}</code> &middot; Spacing: <b>${spacingBlocks} blocks</b> (${minSectionStep} sections) &middot; Chebyshev &ge; 3 Disjoint Guarantee: <b style="color:${if (disjointOk) "#22c55e" else "#ef4444"}">${if (disjointOk) "VERIFIED" else "OVERLAPPING"}</b></p>
+<svg width="$svgW" height="$svgH" viewBox="0 0 $svgW $svgH" style="background:#080c14;border:1px solid #26324d;border-radius:8px;max-width:100%">$svgElements</svg></div>
+<div class="card"><table><thead><tr><th>Region</th><th>Block (X, Z)</th><th>Chunk (X, Z)</th><th>Section (X, Z)</th></tr></thead><tbody>$rowsHtml</tbody></table></div></div></body></html>"""
+    }
 }

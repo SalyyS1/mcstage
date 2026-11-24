@@ -133,6 +133,7 @@ class McstageMcpServer {
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
                 "mcstage_export_doctor_html" -> toolExportDoctorHtml(args)
+                "mcstage_export_folia_topology_html" -> toolExportFoliaTopologyHtml(args)
                 "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
@@ -761,6 +762,26 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportFoliaTopologyHtml(args: JsonObject): JsonObject {
+        val regions = (args["regions"]?.jsonPrimitive?.intOrNull ?: 4).coerceIn(1, 32)
+        val modeRaw = args["mode"]?.jsonPrimitive?.contentOrNull ?: "merge-split"
+        val spacing = (args["spacing"]?.jsonPrimitive?.intOrNull ?: FoliaRegionTopology.DEFAULT_SPACING_BLOCKS).coerceAtLeast(768)
+        val mode = if (modeRaw.equals("disjoint", ignoreCase = true)) {
+            FoliaRegionTopology.Mode.DISJOINT
+        } else {
+            FoliaRegionTopology.Mode.MERGE_SPLIT
+        }
+        val anchors = FoliaRegionTopology.planNodes(regions = regions, spacingBlocks = spacing)
+        val html = FoliaRegionTopology.renderTopologyHtml(anchors, mode, spacing)
+        return buildJsonObject {
+            put("regions", regions)
+            put("mode", mode.id)
+            put("spacing_blocks", spacing)
+            put("html_bytes", html.length)
+            put("html", html)
+        }
+    }
+
     private fun toolExportSummaryBadge(args: JsonObject): JsonObject {
         val raw = args["report_json"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Missing required 'report_json' string.")
@@ -823,6 +844,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
         add(toolDef("mcstage_export_doctor_html", "Run mcstage environment doctor and render a self-contained dark-mode HTML readiness report.", emptyList()))
+        add(toolDef("mcstage_export_folia_topology_html", "Plan Folia ThreadedRegionizer 16-chunk section anchors and render a dark-mode SVG topology HTML diagram.", emptyList()))
         add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
@@ -840,7 +862,7 @@ class McstageMcpServer {
                         putJsonObject("max_stall_ms") { put("type", "integer") }
                         putJsonObject("sarif") { put("type", "boolean") }
                     }
-                    "mcstage_plan_folia_topology" -> {
+                    "mcstage_plan_folia_topology", "mcstage_export_folia_topology_html" -> {
                         putJsonObject("regions") { put("type", "integer") }
                         putJsonObject("mode") { put("type", "string") }
                         putJsonObject("spacing") { put("type", "integer") }
