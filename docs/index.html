@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.26.0 | Real-Server Plugin Matrix Builder, 15-Tool MCP Server, GitHub Action &amp; Rules CLI</title>
+  <title>mcstage v0.27.0 | Real-Server Plugin Matrix Builder, 15-Tool MCP Server, Plugin Manifest Linter &amp; CI Budget</title>
   <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.26.0 YAML scenarios: GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator (mcstage budget), headless SLP probe (mcstage probe), init presets, pre-boot plugin JAR inspector (MCS023), preflight auditor (MCS022), world integrity checker (MCS021), 15-tool stdio MCP server, SARIF v2.1.0, and JUnit XML aggregation." />
   <style>
     :root {
@@ -646,11 +646,33 @@ network-compression-threshold=256</textarea>
         <div id="mcCalcVerdict" class="status-box status-ok" style="margin-bottom:10px;"></div>
         <pre id="mcCalcOut" style="max-height:260px;"></pre>
       </div>
+      <div class="card" style="grid-column: 1 / -1;">
+        <h2>
+          <span>Plugin JAR Manifest Linter (<code>paper-plugin.yml</code> / <code>plugin.yml</code> · MCS023)</span>
+          <button class="btn btn-primary" onclick="runManifestLint()">Lint Manifest</button>
+        </h2>
+        <div class="row">
+          <div>
+            <label for="mfYaml">Paste <code>paper-plugin.yml</code> or <code>plugin.yml</code></label>
+            <textarea id="mfYaml" rows="7" oninput="runManifestLint()" style="width:100%;font-family:var(--mono);font-size:12px;background:#090d16;color:#d9e5ff;border:1px solid var(--border);border-radius:6px;padding:8px;">name: MyRPGPlugin
+version: 1.0.0
+main: com.salyvn.myrpg.MyRpgPlugin
+api-version: 1.2
+depend: [Vault]
+folia-supported: false</textarea>
+          </div>
+          <div>
+            <label><input type="checkbox" id="mfTargetFolia" checked onchange="runManifestLint()" /> Target Folia Regionized Multithreading</label>
+            <div id="mfVerdict" class="status-box status-ok" style="margin:8px 0;"></div>
+            <pre id="mfOut" style="max-height:175px;"></pre>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.24.0 · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.27.0 · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
   </footer>
 
   <script>
@@ -1782,12 +1804,40 @@ network-compression-threshold=256</textarea>
       document.getElementById("rconTraceOut").textContent = trace.join("\n");
     }
 
+    function runManifestLint() {
+      const txt = (document.getElementById("mfYaml") || {}).value || "";
+      const folia = Boolean((document.getElementById("mfTargetFolia") || {}).checked);
+      const issues = [];
+      if (!/^name:\s*\S+/m.test(txt)) issues.push("[MCS023/ERR] Missing required 'name:' field.");
+      if (!/^main:\s*[a-zA-Z0-9_.$]+/m.test(txt)) issues.push("[MCS023/ERR] Missing required 'main:' fully qualified plugin class.");
+      if (/^api-version:\s*\d+\.\d+\s*$/m.test(txt) && !/^api-version:\s*['"]/.test(txt)) {
+        issues.push("[MCS023/WARN] Unquoted float api-version (e.g. 1.20 -> YAML parses as 1.2). Quote as api-version: '1.21.4'.");
+      }
+      if (/^depend:\s*/m.test(txt) && /paper-plugin|dependencies:/m.test(txt)) {
+        issues.push("[MCS023/WARN] Legacy 'depend:' key mixed with Paper plugin syntax. Use 'dependencies.server:'.");
+      }
+      if (folia && !/^folia-supported:\s*true\b/mi.test(txt)) {
+        issues.push("[MCS023/ERR] Target Folia enabled but 'folia-supported: true' is missing or false.");
+      }
+      const verdict = document.getElementById("mfVerdict");
+      const out = document.getElementById("mfOut");
+      if (verdict) {
+        const hasErr = issues.some((i) => i.includes("/ERR]"));
+        verdict.className = "status-box " + (hasErr ? "status-err" : (issues.length ? "status-warn" : "status-ok"));
+        verdict.textContent = issues.length === 0 ? "PASS — Manifest clean for pre-boot JAR packaging (MCS023)" : `${issues.length} issue(s) found — run: mcstage inspect-jar build/libs/Plugin.jar${folia ? " --folia" : ""}`;
+      }
+      if (out) {
+        out.textContent = issues.length ? issues.join("\n") : "No MCS023 issues detected.\nCLI check: java -jar mcstage.jar inspect-jar build/libs/Plugin.jar" + (folia ? " --folia" : "");
+      }
+    }
+
     renderStepsEditor();
     renderScenario();
     loadLogSample("barrier");
     renderTopology();
     loadSampleJunit();
     simulateRconFault();
+    runManifestLint();
   </script>
 </body>
 </html>
