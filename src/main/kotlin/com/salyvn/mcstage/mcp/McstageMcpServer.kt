@@ -132,6 +132,7 @@ class McstageMcpServer {
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
+                "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -746,6 +747,31 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportSummaryBadge(args: JsonObject): JsonObject {
+        val raw = args["report_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'report_json' string.")
+        val root = json.parseToJsonElement(raw).jsonObject
+        val scenario = root["scenario"]?.jsonPrimitive?.contentOrNull ?: "mcstage"
+        val cases = root["cases"]?.jsonArray.orEmpty()
+        val passed = cases.count {
+            it.jsonObject["outcome"]?.jsonPrimitive?.contentOrNull.equals("PASSED", ignoreCase = true)
+        }
+        val ok = cases.isNotEmpty() && passed == cases.size
+        val badge = buildJsonObject {
+            put("schemaVersion", 1)
+            put("label", "mcstage")
+            put("message", "${if (ok) "PASS" else "FAIL"} ($passed/${cases.size})")
+            put("color", if (ok) "brightgreen" else "red")
+        }
+        return buildJsonObject {
+            put("scenario", scenario)
+            put("passed", passed)
+            put("total", cases.size)
+            put("ok", ok)
+            put("badge", badge)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -782,6 +808,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
+        add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -874,6 +901,9 @@ class McstageMcpServer {
                     "mcstage_export_doctor_badge" -> {
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("bridge_url") { put("type", "string") }
+                    }
+                    "mcstage_export_summary_badge" -> {
+                        putJsonObject("report_json") { put("type", "string") }
                     }
                 }
             }
