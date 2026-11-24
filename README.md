@@ -10,7 +10,9 @@ thresholds (`assert-heap`), quiet windows, crash signatures, and generated plugi
 XML, Markdown CI summaries, or OASIS SARIF v2.1.0 reports. It downloads official server builds, verifies publisher
 digests (`SHA-256` / `MD5`) on both cache write and cache read, and reuses cached jars and worlds across runs:
 
-- **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Recovery, RCON Fault & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice & crash-loop recovery planner, deterministic SplitMix64 RCON latency/drop simulator, `MCS001`-`MCS017` crash/barrier log analyzer, and multi-file JUnit XML aggregator).
+- **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Recovery, RCON Fault & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice & crash-loop recovery planner, deterministic SplitMix64 RCON latency/drop simulator, `MCS001`-`MCS019` crash/barrier/bot-probe/bridge log analyzer, and multi-file JUnit XML aggregator).
+- **Built-In Stdio MCP Server (`mcstage mcp`):** Connect Claude Code, Cursor, Windsurf, Codex, or Antigravity directly to `java -jar mcstage-0.7.0.jar mcp` to validate scenarios offline, run `MCS001`-`MCS019` log + SARIF diagnostics, plan Folia region topologies, and generate `mcstage.yml` suites.
+- **Headless SLP Bot Probe (`bot-probe` / `MCS018`) & Companion Bridge Telemetry (`assert-bridge` / `MCS019`):** Verify live loopback Minecraft Java Edition TCP handshakes, latency, version/MOTD, and companion `mckit-bridge-plugin` TPS/MSPT/SEVERE error budgets without opening a desktop Minecraft client!
 
 ```
 $ mcstage test mcstage.yml --accept-eula --sarif build/reports/mcstage.sarif
@@ -47,13 +49,14 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.6.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.7.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.6.0.jar init                          # generates starter mcstage.yml
-java -jar mcstage-0.6.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, regex, matrix, and Java check
-java -jar mcstage-0.6.0.jar test mcstage.yml --accept-eula --format junit -o build/reports/mcstage.xml --sarif mcstage.sarif
-java -jar mcstage-0.6.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.7.0.jar init                          # generates starter mcstage.yml
+java -jar mcstage-0.7.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, regex, matrix, and Java check
+java -jar mcstage-0.7.0.jar test mcstage.yml --accept-eula --format junit -o build/reports/mcstage.xml --sarif mcstage.sarif
+java -jar mcstage-0.7.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.7.0.jar mcp                           # run as a JSON-RPC 2.0 stdio MCP server for AI coding agents
 ```
 
 ## Writing a Scenario (`mcstage.yml`)
@@ -128,6 +131,7 @@ and step type (`expect`, `not-expect`, `send`, `wait`, `enabled`, `file-exists`,
 | `mcstage versions [platform]` | List versions currently published by Paper, Folia, and Purpur APIs. |
 | `mcstage cache` | Inspect digest-addressed cached server jars (`--clear` to purge). |
 | `mcstage init [file]` | Scaffold a starter `mcstage.yml` scenario. |
+| `mcstage mcp` | Run `mcstage` as a JSON-RPC 2.0 stdio MCP server (`mcstage_validate_scenario`, `mcstage_analyze_log`, `mcstage_plan_folia_topology`, `mcstage_generate_scenario`, `mcstage_list_rules`). |
 
 Interactive local development without hand-maintaining start scripts:
 

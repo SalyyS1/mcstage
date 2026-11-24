@@ -9,6 +9,7 @@ import com.salyvn.mcstage.cli.AggregateCommand
 import com.salyvn.mcstage.cli.CacheCommand
 import com.salyvn.mcstage.cli.CreateCommand
 import com.salyvn.mcstage.cli.InitCommand
+import com.salyvn.mcstage.cli.McpCommand
 import com.salyvn.mcstage.cli.RunCommand
 import com.salyvn.mcstage.cli.TestCommand
 import com.salyvn.mcstage.cli.ValidateCommand
@@ -41,5 +42,6 @@ fun main(args: Array<String>) = McstageCli()
         VersionsCommand(),
         CacheCommand(),
         InitCommand(),
+        McpCommand(),
     )
     .main(args)

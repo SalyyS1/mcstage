@@ -165,6 +165,38 @@ sealed interface Step {
                 return "inject RCON fault (${profile.iterations} cmd(s), latency=${Durations.format(profile.baseLatency)}, drop=$dropPct%, max-p95=${Durations.format(profile.maxP95Latency)})"
             }
     }
+
+    /**
+     * Performs a lightweight pure-JVM Minecraft Java Edition SLP TCP handshake against the live test server
+     * (zero Minecraft desktop client required), enforcing latency and optional version/MOTD expectations (`MCS018`).
+     */
+    data class BotProbe(
+        val maxLatency: Duration = Duration.ofMillis(500),
+        val protocolVersion: Int = 769,
+        val expectVersion: LineMatcher? = null,
+        val expectMotd: LineMatcher? = null,
+        val port: Int? = null,
+        val timeout: Duration = Duration.ofSeconds(3),
+    ) : Step {
+        override val describe: String
+            get() = "headless bot SLP probe (max-latency <= ${Durations.format(maxLatency)})"
+    }
+
+    /**
+     * Queries the optional loopback `mckit-bridge-plugin` HTTP telemetry API (`/api/v1/metrics` and `/api/v1/errors`)
+     * to assert TPS/MSPT budgets and error ceilings (`MCS019`).
+     */
+    data class AssertBridge(
+        val baseUrl: String = "http://127.0.0.1:25590",
+        val token: String = "",
+        val minTps: Double = 18.0,
+        val maxMspt: Double = 45.0,
+        val maxErrors: Int = 0,
+        val timeout: Duration = Duration.ofSeconds(3),
+    ) : Step {
+        override val describe: String
+            get() = "assert bridge telemetry (tps >= $minTps, mspt <= ${maxMspt}ms, errors <= $maxErrors)"
+    }
 }
 
 /** Ensures scenario file assertions never escape the server instance directory. */

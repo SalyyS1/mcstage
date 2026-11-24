@@ -192,6 +192,24 @@ object CrashAnalyzer {
             help = "Reconnect and re-authenticate RCON sockets on EOF or negative requestId (-1), enforce 4096-byte client payload bounds, and validate response request IDs.",
             fatalForCrashGuard = true,
         ),
+        DiagnosticRule(
+            id = "MCS018",
+            name = "BotProtocolProbeFailed",
+            defaultSeverity = "error",
+            shortDescription = "Headless Minecraft SLP protocol handshake failed or exceeded latency budget",
+            fullDescription = "The loopback server did not respond to a Minecraft Java Edition Server List Ping handshake, returned an unexpected version/MOTD, or exceeded max-latency.",
+            help = "Verify Netty listener binding, server-port allocation, ViaVersion/packet listener hooks, and main-thread handshake stalls.",
+            fatalForCrashGuard = true,
+        ),
+        DiagnosticRule(
+            id = "MCS019",
+            name = "BridgeTelemetryBreach",
+            defaultSeverity = "error",
+            shortDescription = "Companion mckit-bridge-plugin reported TPS/MSPT degradation or SEVERE log errors",
+            fullDescription = "The assert-bridge step observed TPS below min-tps, MSPT above max-mspt, or SEVERE errors exceeding max-errors on the companion mckit-bridge-plugin loopback API.",
+            help = "Inspect plugins/MCKitBridge telemetry and /api/v1/errors output to isolate plugin tick regressions or uncaught exceptions.",
+            fatalForCrashGuard = true,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }

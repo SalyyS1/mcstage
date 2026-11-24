@@ -4,8 +4,18 @@ import com.salyvn.mcstage.core.Durations
 import com.salyvn.mcstage.core.JavaRuntime
 import com.salyvn.mcstage.core.PortProbe
 import com.salyvn.mcstage.instance.Instance
+import com.salyvn.mcstage.protocol.MinecraftSlpProbe
 import com.salyvn.mcstage.rcon.LoopbackRconBridgeServer
 import com.salyvn.mcstage.rcon.RconFaultInjector
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -160,7 +170,7 @@ class ScenarioRunner(
         val bootLineNumber = server.linesSeen
 
         if (failure == null) {
-            val stepFailure = runSteps(scenario, instance.dir, server, steps, bootLineNumber, ::consume)
+            val stepFailure = runSteps(scenario, instance.dir, port, server, steps, bootLineNumber, ::consume)
             if (stepFailure != null) {
                 failure = stepFailure.message
                 failureRuleId = stepFailure.ruleId
@@ -242,6 +252,7 @@ class ScenarioRunner(
     private fun runSteps(
         scenario: Scenario,
         instanceDir: Path,
+        serverPort: Int,
         server: ServerProcess,
         steps: MutableList<StepResult>,
         bootLineNumber: Int,
@@ -312,6 +323,18 @@ class ScenarioRunner(
                 is Step.RconFault -> {
                     val (stepRes, rconRule) = runRconFault(step, server, consume, ::took)
                     if (rconRule != null) overrideRuleId = rconRule
+                    stepRes
+                }
+
+                is Step.BotProbe -> {
+                    val stepRes = runBotProbe(step, serverPort, server, consume, ::took)
+                    if (!stepRes.ok) overrideRuleId = "MCS018"
+                    stepRes
+                }
+
+                is Step.AssertBridge -> {
+                    val stepRes = runAssertBridge(step, server, consume, ::took)
+                    if (!stepRes.ok) overrideRuleId = "MCS019"
                     stepRes
                 }
             }
@@ -885,6 +908,102 @@ class ScenarioRunner(
                     matched = report.summaryNote(),
                 ) to (report.failureRuleId ?: "MCS017")
             }
+        }
+    }
+
+    private fun runBotProbe(
+        step: Step.BotProbe,
+        defaultPort: Int,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val targetPort = step.port ?: defaultPort
+        val res = MinecraftSlpProbe.probe(
+            host = "127.0.0.1",
+            port = targetPort,
+            protocolVersion = step.protocolVersion,
+            timeout = step.timeout,
+        )
+        server.drain(minOf(FILE_POLL_MILLIS, 40L), consume)
+        if (!res.reachable) {
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "SLP handshake to 127.0.0.1:$targetPort failed: ${res.error}",
+            )
+        }
+        if (res.latencyMillis > step.maxLatency.toMillis()) {
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "SLP latency ${res.latencyMillis}ms exceeded max-latency ${step.maxLatency.toMillis()}ms",
+            )
+        }
+        if (step.expectVersion != null && !step.expectVersion.matches(res.versionName.orEmpty())) {
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "SLP version '${res.versionName}' did not match ${step.expectVersion.describe}",
+            )
+        }
+        if (step.expectMotd != null && !step.expectMotd.matches(res.motd.orEmpty())) {
+            return StepResult(
+                step.describe,
+                ok = false,
+                elapsed = took(),
+                detail = "SLP MOTD '${res.motd}' did not match ${step.expectMotd.describe}",
+            )
+        }
+        val note = "version=${res.versionName ?: "?"} protocol=${res.protocolVersion ?: -1} latency=${res.latencyMillis}ms"
+        return StepResult(step.describe, ok = true, elapsed = took(), matched = note)
+    }
+
+    private fun runAssertBridge(
+        step: Step.AssertBridge,
+        server: ServerProcess,
+        consume: (LogLine) -> Unit,
+        took: () -> Duration,
+    ): StepResult {
+        val client = HttpClient.newBuilder().connectTimeout(step.timeout).build()
+        val parser = Json { ignoreUnknownKeys = true }
+        fun getJson(path: String): kotlinx.serialization.json.JsonObject {
+            val reqBuilder = HttpRequest.newBuilder()
+                .uri(URI.create("${step.baseUrl}$path"))
+                .timeout(step.timeout)
+                .GET()
+            if (step.token.isNotBlank()) {
+                reqBuilder.header("X-MCKit-Token", step.token)
+            }
+            val resp = client.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString())
+            if (resp.statusCode() != 200) {
+                throw IllegalStateException("Bridge HTTP ${resp.statusCode()} on $path")
+            }
+            return parser.parseToJsonElement(resp.body()).jsonObject
+        }
+
+        return try {
+            val metrics = getJson("/api/v1/metrics")
+            val errorsObj = getJson("/api/v1/errors")
+            server.drain(minOf(FILE_POLL_MILLIS, 40L), consume)
+            val tps = metrics["tps_1m"]?.jsonPrimitive?.doubleOrNull ?: 20.0
+            val mspt = metrics["mspt"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+            val errCount = errorsObj["errors"]?.jsonArray?.size ?: 0
+            val failures = mutableListOf<String>()
+            if (tps < step.minTps) failures += "tps_1m=$tps < ${step.minTps}"
+            if (mspt > step.maxMspt) failures += "mspt=${mspt}ms > ${step.maxMspt}ms"
+            if (errCount > step.maxErrors) failures += "severe_errors=$errCount > ${step.maxErrors}"
+            val summary = "tps=$tps mspt=${mspt}ms errors=$errCount"
+            if (failures.isNotEmpty()) {
+                StepResult(step.describe, ok = false, elapsed = took(), detail = failures.joinToString("; "), matched = summary)
+            } else {
+                StepResult(step.describe, ok = true, elapsed = took(), matched = summary)
+            }
+        } catch (e: Exception) {
+            StepResult(step.describe, ok = false, elapsed = took(), detail = "Bridge query failed: ${e.message}")
         }
     }
 

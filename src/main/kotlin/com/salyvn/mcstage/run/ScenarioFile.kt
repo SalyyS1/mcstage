@@ -31,7 +31,11 @@ object ScenarioFile {
     private val STEP_ACTIONS = setOf(
         "expect", "not-expect", "send", "wait", "enabled", "file-exists", "file-not-exists", "file-contains",
         "inject-lag", "no-barrier-stall", "assert-heap", "assert-region-recovery", "rcon-fault",
+        "bot-probe", "assert-bridge",
     )
+
+    private val BOT_PROBE_KEYS = setOf("max-latency", "protocol", "expect-version", "expect-motd", "port", "timeout")
+    private val ASSERT_BRIDGE_KEYS = setOf("url", "token", "min-tps", "max-mspt", "max-errors", "timeout")
 
     private val ASSERT_HEAP_KEYS = setOf("max-percent", "window")
     private val ASSERT_REGION_RECOVERY_KEYS = setOf(
@@ -283,6 +287,10 @@ object ScenarioFile {
                 step.containsKey("assert-region-recovery") -> parseAssertRegionRecovery(step, explicitTimeout, at)
 
                 step.containsKey("rcon-fault") -> parseRconFault(step, explicitTimeout, at)
+
+                step.containsKey("bot-probe") -> parseBotProbe(step, explicitTimeout, at)
+
+                step.containsKey("assert-bridge") -> parseAssertBridge(step, explicitTimeout, at)
 
                 else -> throw SetupError(
                     "$at does not say what to do. Use one of: ${
@@ -615,6 +623,75 @@ object ScenarioFile {
                 password = password,
                 expectResponse = expectResp,
             ),
+        )
+    }
+
+    private fun parseBotProbe(step: Map<*, *>, explicitTimeout: Duration?, at: String): Step.BotProbe {
+        val raw = step["bot-probe"]
+        if (raw == null || raw is Boolean) {
+            return Step.BotProbe(timeout = explicitTimeout ?: Duration.ofSeconds(3))
+        }
+        if (raw !is Map<*, *>) {
+            val dur = duration(raw, "bot-probe", at)
+                ?: throw SetupError("$at: bot-probe expects a max-latency duration or configuration mapping.")
+            return Step.BotProbe(maxLatency = dur, timeout = explicitTimeout ?: Duration.ofSeconds(3))
+        }
+        for (k in raw.keys) {
+            val keyName = k.toString()
+            if (keyName !in BOT_PROBE_KEYS) {
+                val hint = closestKey(keyName, BOT_PROBE_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError("$at: bot-probe has an unknown key '$keyName'.$hint Known keys: ${BOT_PROBE_KEYS.sorted().joinToString(", ")}.")
+            }
+        }
+        val maxLatency = duration(raw["max-latency"], "bot-probe.max-latency", at) ?: Duration.ofMillis(500)
+        if (maxLatency.isZero || maxLatency.isNegative) {
+            throw SetupError("$at: bot-probe.max-latency must be greater than 0ms.")
+        }
+        val protocol = integer(raw["protocol"], "bot-probe.protocol", at) ?: 769
+        val port = integer(raw["port"], "bot-probe.port", at)?.also {
+            if (it !in 1..65535) throw SetupError("$at: bot-probe.port must be between 1 and 65535, got $it.")
+        }
+        val expectVersion = raw["expect-version"]?.let { parseMatcher(text(it, "bot-probe.expect-version", at), "bot-probe.expect-version", at) }
+        val expectMotd = raw["expect-motd"]?.let { parseMatcher(text(it, "bot-probe.expect-motd", at), "bot-probe.expect-motd", at) }
+        val timeout = duration(raw["timeout"], "bot-probe.timeout", at) ?: explicitTimeout ?: Duration.ofSeconds(3)
+        return Step.BotProbe(
+            maxLatency = maxLatency,
+            protocolVersion = protocol,
+            expectVersion = expectVersion,
+            expectMotd = expectMotd,
+            port = port,
+            timeout = timeout,
+        )
+    }
+
+    private fun parseAssertBridge(step: Map<*, *>, explicitTimeout: Duration?, at: String): Step.AssertBridge {
+        val raw = step["assert-bridge"]
+        if (raw !is Map<*, *>) {
+            throw SetupError("$at: assert-bridge expects a mapping with optional url, token, min-tps, max-mspt, max-errors.")
+        }
+        for (k in raw.keys) {
+            val keyName = k.toString()
+            if (keyName !in ASSERT_BRIDGE_KEYS) {
+                val hint = closestKey(keyName, ASSERT_BRIDGE_KEYS)?.let { " Did you mean '$it'?" }.orEmpty()
+                throw SetupError("$at: assert-bridge has an unknown key '$keyName'.$hint Known keys: ${ASSERT_BRIDGE_KEYS.sorted().joinToString(", ")}.")
+            }
+        }
+        val url = raw["url"]?.let { text(it, "assert-bridge.url", at) } ?: "http://127.0.0.1:25590"
+        if (!url.startsWith("http://127.0.0.1") && !url.startsWith("http://localhost")) {
+            throw SetupError("$at: assert-bridge.url must target loopback (127.0.0.1 or localhost).")
+        }
+        val token = raw["token"]?.toString().orEmpty()
+        val minTps = raw["min-tps"]?.toString()?.toDoubleOrNull() ?: 18.0
+        val maxMspt = raw["max-mspt"]?.toString()?.toDoubleOrNull() ?: 45.0
+        val maxErrors = integer(raw["max-errors"], "assert-bridge.max-errors", at) ?: 0
+        val timeout = duration(raw["timeout"], "assert-bridge.timeout", at) ?: explicitTimeout ?: Duration.ofSeconds(3)
+        return Step.AssertBridge(
+            baseUrl = url.trimEnd('/'),
+            token = token,
+            minTps = minTps,
+            maxMspt = maxMspt,
+            maxErrors = maxErrors,
+            timeout = timeout,
         )
     }
 
