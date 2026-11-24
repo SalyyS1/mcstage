@@ -117,6 +117,7 @@ class McstageMcpServer {
                 "mcstage_plan_folia_topology" -> toolPlanFoliaTopology(args)
                 "mcstage_generate_scenario" -> toolGenerateScenario(args)
                 "mcstage_compare_reports" -> toolCompareReports(args)
+                "mcstage_check_world_integrity" -> toolCheckWorldIntegrity(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -324,6 +325,35 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolCheckWorldIntegrity(args: JsonObject): JsonObject {
+        val dirRaw = args["world_dir"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'world_dir' string.")
+        val requireLockCleared = args["require_session_lock_cleared"]?.jsonPrimitive?.booleanOrNull ?: false
+        val rep = com.salyvn.mcstage.run.WorldIntegrityChecker.inspect(
+            java.nio.file.Path.of(dirRaw),
+            requireSessionLockCleared = requireLockCleared,
+        )
+        return buildJsonObject {
+            put("ok", rep.ok)
+            put("world_dir", rep.worldDir)
+            put("level_dat_valid", rep.levelDatValid)
+            put("session_lock_present", rep.sessionLockPresent)
+            put("region_files_scanned", rep.regionFilesScanned)
+            put("valid_chunk_headers", rep.validChunkHeaders)
+            put("issue_count", rep.issues.size)
+            putJsonArray("issues") {
+                for (iss in rep.issues) {
+                    add(buildJsonObject {
+                        put("ruleId", "MCS021")
+                        put("code", iss.code)
+                        put("path", iss.path)
+                        put("message", iss.message)
+                    })
+                }
+            }
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -346,7 +376,8 @@ class McstageMcpServer {
         add(toolDef("mcstage_plan_folia_topology", "Compute disjoint or merge-split Folia ThreadedRegionizer 16-chunk section anchor coordinates.", emptyList()))
         add(toolDef("mcstage_generate_scenario", "Generate a production-ready mcstage.yml with crash-guard, bot-probe, Folia stress, and heap checks.", emptyList()))
         add(toolDef("mcstage_compare_reports", "Compare baseline vs current mcstage JSON reports to flag outcome, boot/scenario latency, or diagnostic regressions (MCS020).", listOf("baseline_json", "current_json")))
-        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS020) and crash-guard policies.", emptyList()))
+        add(toolDef("mcstage_check_world_integrity", "Audit a Minecraft world directory (level.dat GZIP header, session.lock, and Anvil .mca 4096-byte sector alignment & chunk pointers, MCS021).", listOf("world_dir")))
+        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS021) and crash-guard policies.", emptyList()))
     }
 
     private fun toolDef(name: String, description: String, required: List<String>): JsonObject = buildJsonObject {
@@ -377,6 +408,10 @@ class McstageMcpServer {
                         putJsonObject("baseline_json") { put("type", "string") }
                         putJsonObject("current_json") { put("type", "string") }
                         putJsonObject("max_slowdown_pct") { put("type", "number") }
+                    }
+                    "mcstage_check_world_integrity" -> {
+                        putJsonObject("world_dir") { put("type", "string") }
+                        putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
                     }
                 }
             }

@@ -51,6 +51,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_plan_folia_topology",
                 "mcstage_generate_scenario",
                 "mcstage_compare_reports",
+                "mcstage_check_world_integrity",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -62,7 +63,7 @@ class McpServerAndBotProbeTest {
         val rulesPayload = json.parseToJsonElement(
             rulesResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
         ).jsonObject
-        assertEquals(20, rulesPayload["rule_count"]!!.jsonPrimitive.int)
+        assertEquals(21, rulesPayload["rule_count"]!!.jsonPrimitive.int)
 
         val logResp = json.parseToJsonElement(
             server.handleMessage(
@@ -220,5 +221,46 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertFalse(cmpPayload["ok"]!!.jsonPrimitive.boolean)
         assertTrue(cmpPayload["markdown"]!!.jsonPrimitive.content.contains("REGRESSION DETECTED"))
+    }
+
+    @Test
+    fun `world integrity checker validates valid Anvil region and flags truncated corruption`(@TempDir dir: Path) {
+        val worldDir = dir.resolve("world")
+        val regionDir = worldDir.resolve("region")
+        Files.createDirectories(regionDir)
+        // Valid GZIP header (0x1F 0x8B ...)
+        val gzipDummy = ByteArray(24).apply { this[0] = 0x1F; this[1] = 0x8B.toByte() }
+        Files.write(worldDir.resolve("level.dat"), gzipDummy)
+
+        // Valid 3-sector (12288 B) Anvil .mca with 1 chunk at sector 2, count 1
+        val validMca = ByteArray(4096 * 3)
+        validMca[0] = 0; validMca[1] = 0; validMca[2] = 2; validMca[3] = 1
+        Files.write(regionDir.resolve("r.0.0.mca"), validMca)
+
+        val okRep = com.salyvn.mcstage.run.WorldIntegrityChecker.inspect(worldDir, requireSessionLockCleared = true)
+        assertTrue(okRep.ok, okRep.issues.toString())
+        assertEquals(1, okRep.regionFilesScanned)
+        assertEquals(1, okRep.validChunkHeaders)
+
+        // Now add a truncated .mca file and check via MCP tool
+        Files.write(regionDir.resolve("r.0.1.mca"), ByteArray(512))
+        val server = McstageMcpServer()
+        val req = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(25))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_check_world_integrity"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("world_dir", kotlinx.serialization.json.JsonPrimitive(worldDir.toString()))
+                })
+            })
+        }
+        val resp = json.parseToJsonElement(server.handleMessage(req.toString())!!).jsonObject
+        val payload = json.parseToJsonElement(
+            resp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertFalse(payload["ok"]!!.jsonPrimitive.boolean)
+        assertEquals(1, payload["issue_count"]!!.jsonPrimitive.int)
     }
 }

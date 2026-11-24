@@ -219,6 +219,15 @@ object CrashAnalyzer {
             help = "Inspect the markdown or JSON diff from mcstage compare, profile newly added startup/tick work, and resolve new MCS findings before releasing.",
             fatalForCrashGuard = true,
         ),
+        DiagnosticRule(
+            id = "MCS021",
+            name = "WorldIntegrityViolation",
+            defaultSeverity = "error",
+            shortDescription = "Corrupted level.dat, stale session.lock, or truncated/out-of-bounds Anvil .mca region file",
+            fullDescription = "WorldIntegrityChecker detected a missing or non-GZIP level.dat, an unaligned or truncated Anvil .mca region header (< 8192 B or non-4096-byte sectors), out-of-bounds chunk sector pointers, or a stale session.lock.",
+            help = "Inspect plugin chunk save hooks, async world mutations, and Paper/Folia shutdown handlers to prevent truncated region writes.",
+            fatalForCrashGuard = true,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }
