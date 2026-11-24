@@ -508,6 +508,16 @@ class McpServerAndBotProbeTest {
         assertTrue(sarifText.contains("\"MCS003\""))
         com.salyvn.mcstage.cli.PlanFoliaCommand().parse(listOf("--regions", "4", "--mode", "disjoint", "--spacing", "1024", "--json"))
 
+        val repJson = dir.resolve("report.json")
+        val sumMd = dir.resolve("summary.md")
+        Files.writeString(
+            repJson,
+            """{"scenario":"MyRPG","cases":[{"platform":"paper","version":"1.21.4","outcome":"PASSED","elapsedMs":4200,"diagnostics":[]}]}""",
+            StandardCharsets.UTF_8,
+        )
+        com.salyvn.mcstage.cli.SummaryCommand().parse(listOf(repJson.toString(), "-o", sumMd.toString()))
+        assertTrue(Files.readString(sumMd, StandardCharsets.UTF_8).contains("PASS` (1/1)"))
+
         // Verify ProbeCommand against a real local loopback SLP socket
         ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
             val port = ss.localPort

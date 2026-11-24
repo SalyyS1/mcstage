@@ -22,6 +22,7 @@ import com.salyvn.mcstage.cli.PlanFoliaCommand
 import com.salyvn.mcstage.cli.PreflightCommand
 import com.salyvn.mcstage.cli.ProbeCommand
 import com.salyvn.mcstage.cli.RunCommand
+import com.salyvn.mcstage.cli.SummaryCommand
 import com.salyvn.mcstage.cli.TestCommand
 import com.salyvn.mcstage.cli.ValidateCommand
 import com.salyvn.mcstage.cli.VersionsCommand
@@ -64,6 +65,7 @@ fun main(args: Array<String>) = McstageCli()
         ListRulesCommand(),
         AnalyzeLogCommand(),
         PlanFoliaCommand(),
+        SummaryCommand(),
         McpCommand(),
     )
     .main(args)
