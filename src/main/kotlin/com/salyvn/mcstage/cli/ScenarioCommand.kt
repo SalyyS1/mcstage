@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.report.ConsoleRunReporter
+import com.salyvn.mcstage.report.HtmlRunReporter
 import com.salyvn.mcstage.report.JsonRunReporter
 import com.salyvn.mcstage.report.JunitXmlRunReporter
 import com.salyvn.mcstage.report.SarifRunReporter
@@ -29,7 +30,7 @@ import java.nio.file.Files
  */
 abstract class ScenarioCommand(name: String) : McstageCommand(name) {
 
-    protected val format by option("--format", help = "Output format").choice("console", "json", "junit", "sarif")
+    protected val format by option("--format", help = "Output format").choice("console", "json", "junit", "sarif", "html")
         .default("console")
 
     protected val output by option("-o", "--output", help = "Write the report to this file").path()
@@ -37,6 +38,11 @@ abstract class ScenarioCommand(name: String) : McstageCommand(name) {
     protected val sarif by option(
         "--sarif",
         help = "Write an OASIS SARIF v2.1.0 report to this file alongside the primary output",
+    ).path()
+
+    protected val htmlOut by option(
+        "--html",
+        help = "Write a self-contained dark-mode HTML matrix report to this file alongside the primary output",
     ).path()
 
     protected val tail by option("--tail", help = "Print the server's own output as it arrives").flag()
@@ -74,6 +80,7 @@ abstract class ScenarioCommand(name: String) : McstageCommand(name) {
             "json" -> JsonRunReporter().render(report)
             "junit" -> JunitXmlRunReporter().render(report)
             "sarif" -> SarifRunReporter().render(report)
+            "html" -> HtmlRunReporter().render(report)
             else -> ConsoleRunReporter(color = !noColor && output == null, verbose = verbose).render(report)
         }
 
@@ -83,6 +90,15 @@ abstract class ScenarioCommand(name: String) : McstageCommand(name) {
             Files.writeString(target, sarifText)
             if (output != target) {
                 echo("Wrote sarif report to $target")
+            }
+        }
+
+        htmlOut?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            val htmlText = if (format == "html") text else HtmlRunReporter().render(report)
+            Files.writeString(target, htmlText)
+            if (output != target) {
+                echo("Wrote html report to $target")
             }
         }
 

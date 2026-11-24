@@ -283,4 +283,27 @@ class McpServerAndBotProbeTest {
         assertTrue(payload["ok"]!!.jsonPrimitive.boolean)
         assertTrue(payload["java"]!!.jsonObject["ok"]!!.jsonPrimitive.boolean)
     }
+
+    @Test
+    fun `html run reporter escapes special characters and renders pass fail matrix`() {
+        val rep = com.salyvn.mcstage.run.RunReport(
+            tool = "mcstage",
+            toolVersion = "0.13.0",
+            scenario = "RPG <script>alert(1)</script> QA",
+            startedAt = java.time.Instant.EPOCH,
+            cases = listOf(
+                com.salyvn.mcstage.run.CaseResult(
+                    case = com.salyvn.mcstage.run.Scenario.Case(com.salyvn.mcstage.core.Platform.PAPER, "26.3"),
+                    outcome = com.salyvn.mcstage.run.Outcome.PASSED,
+                    elapsed = Duration.ofMillis(1200),
+                    steps = listOf(com.salyvn.mcstage.run.StepResult("enabled: MyRPG", ok = true, elapsed = Duration.ofMillis(300))),
+                ),
+            ),
+        )
+        val html = com.salyvn.mcstage.report.HtmlRunReporter().render(rep)
+        assertTrue(html.contains("<!doctype html>"))
+        assertFalse(html.contains("<script>alert(1)</script>"))
+        assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"))
+        assertTrue(html.contains("PASS (1/1)"))
+    }
 }
