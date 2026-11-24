@@ -18,6 +18,7 @@ import com.salyvn.mcstage.cli.InitCommand
 import com.salyvn.mcstage.cli.InspectJarCommand
 import com.salyvn.mcstage.cli.ListRulesCommand
 import com.salyvn.mcstage.cli.McpCommand
+import com.salyvn.mcstage.cli.PlanFoliaCommand
 import com.salyvn.mcstage.cli.PreflightCommand
 import com.salyvn.mcstage.cli.ProbeCommand
 import com.salyvn.mcstage.cli.RunCommand
@@ -62,6 +63,7 @@ fun main(args: Array<String>) = McstageCli()
         GithubActionCommand(),
         ListRulesCommand(),
         AnalyzeLogCommand(),
+        PlanFoliaCommand(),
         McpCommand(),
     )
     .main(args)

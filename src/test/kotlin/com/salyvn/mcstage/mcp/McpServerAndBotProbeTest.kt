@@ -506,6 +506,7 @@ class McpServerAndBotProbeTest {
         com.salyvn.mcstage.cli.AnalyzeLogCommand().parse(listOf(sampleLog.toString(), "--sarif", sarifOut.toString(), "--json"))
         val sarifText = Files.readString(sarifOut, StandardCharsets.UTF_8)
         assertTrue(sarifText.contains("\"MCS003\""))
+        com.salyvn.mcstage.cli.PlanFoliaCommand().parse(listOf("--regions", "4", "--mode", "disjoint", "--spacing", "1024", "--json"))
 
         // Verify ProbeCommand against a real local loopback SLP socket
         ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
