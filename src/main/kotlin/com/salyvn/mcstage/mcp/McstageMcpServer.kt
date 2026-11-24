@@ -118,6 +118,7 @@ class McstageMcpServer {
                 "mcstage_generate_scenario" -> toolGenerateScenario(args)
                 "mcstage_compare_reports" -> toolCompareReports(args)
                 "mcstage_check_world_integrity" -> toolCheckWorldIntegrity(args)
+                "mcstage_doctor" -> toolDoctor(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -354,6 +355,16 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolDoctor(args: JsonObject): JsonObject {
+        val port = (args["port"]?.jsonPrimitive?.intOrNull ?: 25565).coerceIn(1, 65535)
+        val bridgeUrl = args["bridge_url"]?.jsonPrimitive?.contentOrNull
+        val report = com.salyvn.mcstage.core.DoctorCheck.run(
+            port = port,
+            bridgeUrl = bridgeUrl,
+        )
+        return com.salyvn.mcstage.core.DoctorCheck.toJson(report)
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -377,6 +388,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_generate_scenario", "Generate a production-ready mcstage.yml with crash-guard, bot-probe, Folia stress, and heap checks.", emptyList()))
         add(toolDef("mcstage_compare_reports", "Compare baseline vs current mcstage JSON reports to flag outcome, boot/scenario latency, or diagnostic regressions (MCS020).", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_check_world_integrity", "Audit a Minecraft world directory (level.dat GZIP header, session.lock, and Anvil .mca 4096-byte sector alignment & chunk pointers, MCS021).", listOf("world_dir")))
+        add(toolDef("mcstage_doctor", "Inspect local Java 21+ runtime, JAR cache health, loopback port availability, and optional companion mckit-bridge-plugin readiness.", emptyList()))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS021) and crash-guard policies.", emptyList()))
     }
 
@@ -412,6 +424,10 @@ class McstageMcpServer {
                     "mcstage_check_world_integrity" -> {
                         putJsonObject("world_dir") { put("type", "string") }
                         putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
+                    }
+                    "mcstage_doctor" -> {
+                        putJsonObject("port") { put("type", "integer") }
+                        putJsonObject("bridge_url") { put("type", "string") }
                     }
                 }
             }

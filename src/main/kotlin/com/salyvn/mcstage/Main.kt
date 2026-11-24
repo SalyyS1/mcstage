@@ -9,6 +9,7 @@ import com.salyvn.mcstage.cli.AggregateCommand
 import com.salyvn.mcstage.cli.CacheCommand
 import com.salyvn.mcstage.cli.CompareCommand
 import com.salyvn.mcstage.cli.CreateCommand
+import com.salyvn.mcstage.cli.DoctorCommand
 import com.salyvn.mcstage.cli.InitCommand
 import com.salyvn.mcstage.cli.McpCommand
 import com.salyvn.mcstage.cli.RunCommand
@@ -44,6 +45,7 @@ fun main(args: Array<String>) = McstageCli()
         VersionsCommand(),
         CacheCommand(),
         InitCommand(),
+        DoctorCommand(),
         McpCommand(),
     )
     .main(args)

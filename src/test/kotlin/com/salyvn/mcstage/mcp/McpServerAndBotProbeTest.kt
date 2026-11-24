@@ -52,6 +52,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_generate_scenario",
                 "mcstage_compare_reports",
                 "mcstage_check_world_integrity",
+                "mcstage_doctor",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -262,5 +263,24 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertFalse(payload["ok"]!!.jsonPrimitive.boolean)
         assertEquals(1, payload["issue_count"]!!.jsonPrimitive.int)
+    }
+
+    @Test
+    fun `doctor check verifies Java 21 runtime and mcstage_doctor MCP tool`(@TempDir dir: Path) {
+        val rep = com.salyvn.mcstage.core.DoctorCheck.run(port = 25599, cacheRoot = dir)
+        assertTrue(rep.ok)
+        assertTrue(rep.javaOk)
+        assertEquals(0, rep.cachedJarCount)
+        assertTrue(com.salyvn.mcstage.core.DoctorCheck.renderText(rep).contains("READY"))
+
+        val server = McstageMcpServer()
+        val resp = json.parseToJsonElement(
+            server.handleMessage("""{"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"mcstage_doctor","arguments":{"port":25599}}}""")!!,
+        ).jsonObject
+        val payload = json.parseToJsonElement(
+            resp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(payload["ok"]!!.jsonPrimitive.boolean)
+        assertTrue(payload["java"]!!.jsonObject["ok"]!!.jsonPrimitive.boolean)
     }
 }
