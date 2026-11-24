@@ -8,10 +8,12 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.run.WorldIntegrityChecker
+import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * CLI subcommand for offline Minecraft Anvil world integrity verification (`MCS021`).
@@ -23,10 +25,56 @@ class CheckWorldCommand : CliktCommand(name = "check-world") {
 
     private val worldDir by argument("world", help = "Path to Minecraft world directory (e.g. ./world)").path()
     private val requireUnlocked by option("--require-unlocked", help = "Fail if stale session.lock is still present").flag()
+    private val sarif by option("--sarif", help = "Write OASIS SARIF v2.1.0 Code Scanning report (MCS021)").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
         val report = WorldIntegrityChecker.inspect(worldDir, requireSessionLockCleared = requireUnlocked)
+        sarif?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            val sarifDoc = buildJsonObject {
+                put("\$schema", "https://json.schemastore.org/sarif-2.1.0.json")
+                put("version", "2.1.0")
+                putJsonArray("runs") {
+                    add(buildJsonObject {
+                        putJsonObject("tool") {
+                            putJsonObject("driver") {
+                                put("name", "mcstage")
+                                put("version", "0.35.0")
+                                putJsonArray("rules") {
+                                    add(buildJsonObject {
+                                        put("id", "MCS021")
+                                        put("name", "WorldAnvilIntegrityViolation")
+                                        putJsonObject("shortDescription") {
+                                            put("text", "Minecraft world level.dat, session.lock, or Anvil .mca corruption")
+                                        }
+                                    })
+                                }
+                            }
+                        }
+                        putJsonArray("results") {
+                            for (iss in report.issues) {
+                                add(buildJsonObject {
+                                    put("ruleId", "MCS021")
+                                    put("level", "error")
+                                    putJsonObject("message") { put("text", "${iss.code}: ${iss.message}") }
+                                    putJsonArray("locations") {
+                                        add(buildJsonObject {
+                                            putJsonObject("physicalLocation") {
+                                                putJsonObject("artifactLocation") {
+                                                    put("uri", iss.path.replace('\\', '/'))
+                                                }
+                                            }
+                                        })
+                                    }
+                                })
+                            }
+                        }
+                    })
+                }
+            }
+            Files.writeString(target, PRETTY_JSON.encodeToString(sarifDoc))
+        }
         if (json) {
             val payload = buildJsonObject {
                 put("ok", report.ok)
