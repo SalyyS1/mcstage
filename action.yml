@@ -37,7 +37,7 @@ inputs:
   version:
     description: 'MCStage release tag to download'
     required: false
-    default: 'v0.14.0'
+    default: 'v0.15.0'
 
 outputs:
   sarif-file:

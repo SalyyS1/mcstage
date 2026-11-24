@@ -54,6 +54,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_check_world_integrity",
                 "mcstage_doctor",
                 "mcstage_probe_server",
+                "mcstage_aggregate_junit",
                 "mcstage_list_rules",
             ),
             toolNames,

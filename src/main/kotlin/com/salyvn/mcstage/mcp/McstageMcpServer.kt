@@ -120,6 +120,7 @@ class McstageMcpServer {
                 "mcstage_check_world_integrity" -> toolCheckWorldIntegrity(args)
                 "mcstage_doctor" -> toolDoctor(args)
                 "mcstage_probe_server" -> toolProbeServer(args)
+                "mcstage_aggregate_junit" -> toolAggregateJunit(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -389,6 +390,21 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolAggregateJunit(args: JsonObject): JsonObject {
+        val rawInputs = args["inputs"]?.let { el ->
+            (el as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        } ?: throw IllegalArgumentException("Missing required 'inputs' array of JUnit XML paths/dirs/globs.")
+        val suiteName = args["name"]?.jsonPrimitive?.contentOrNull?.ifBlank { "mcstage-aggregated" } ?: "mcstage-aggregated"
+        val agg = com.salyvn.mcstage.report.JunitXmlAggregator()
+        val files = agg.discoverXmlFiles(rawInputs)
+        val rep = agg.aggregateFiles(files, name = suiteName)
+        val parsed = json.parseToJsonElement(agg.renderJson(rep)).jsonObject
+        return buildJsonObject {
+            for ((k, v) in parsed) put(k, v)
+            put("markdown", agg.renderMarkdown(rep))
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -414,6 +430,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_check_world_integrity", "Audit a Minecraft world directory (level.dat GZIP header, session.lock, and Anvil .mca 4096-byte sector alignment & chunk pointers, MCS021).", listOf("world_dir")))
         add(toolDef("mcstage_doctor", "Inspect local Java 21+ runtime, JAR cache health, loopback port availability, and optional companion mckit-bridge-plugin readiness.", emptyList()))
         add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
+        add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS021) and crash-guard policies.", emptyList()))
     }
 
@@ -458,6 +475,10 @@ class McstageMcpServer {
                         putJsonObject("host") { put("type", "string") }
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("timeout_ms") { put("type", "integer") }
+                    }
+                    "mcstage_aggregate_junit" -> {
+                        putJsonObject("inputs") { put("type", "array") }
+                        putJsonObject("name") { put("type", "string") }
                     }
                 }
             }

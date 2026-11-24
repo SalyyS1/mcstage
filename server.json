@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "io.github.SalyyS1/mcstage",
-  "description": "Real-server Minecraft plugin integration test runner & 9-tool stdio MCP server for Paper, Folia, and Purpur with self-contained HTML matrix reports, mcstage doctor, live SLP probe, Anvil world integrity checker (MCS021), baseline comparator (MCS020), headless SLP bot probes (MCS018), companion bridge TPS/GUI checks (MCS019), Folia recovery, RCON fault injection, and SARIF v2.1.0.",
-  "version": "0.14.0",
+  "description": "Real-server Minecraft plugin integration test runner & 10-tool stdio MCP server for Paper, Folia, and Purpur with self-contained HTML matrix reports, JUnit XML aggregator, mcstage doctor, live SLP probe, Anvil world integrity checker (MCS021), baseline comparator (MCS020), headless SLP bot probes (MCS018), companion bridge TPS/GUI checks (MCS019), Folia recovery, RCON fault injection, and SARIF v2.1.0.",
+  "version": "0.15.0",
   "repository": {
     "url": "https://github.com/SalyyS1/mcstage",
     "source": "github"
