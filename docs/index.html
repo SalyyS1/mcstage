@@ -287,26 +287,27 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.20.0 | 15-Tool Stdio MCP · GitHub Action Gen · CI Shard Estimator · HTML Diffs · JAR/Config Preflight</span>
+        <span class="badge">mcstage v0.21.0 | 15-Tool Stdio MCP · inspect-jar &amp; preflight CLI · CI Shard Estimator · HTML Diffs · MCS001-MCS023</span>
         <div class="navlinks">
           <a href="https://salyys1.github.io/minecraftkit/showcase.html">MinecraftKit Suite</a>
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
           <a href="https://github.com/SalyyS1/mcstage/releases">Releases (CLI JAR)</a>
         </div>
       </div>
-      <h1>MCStage Real-Server Plugin Matrix Builder, MCP Server, Bot Probe &amp; Regression Lab</h1>
+      <h1>MCStage Real-Server Plugin Matrix Builder, MCP Server, Preflight &amp; Regression Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020), assert-region-recovery crash-loop guards, deterministic Source RCON fault injection, MCS001-MCS020 SARIF v2.1.0 diagnostics, and a 6-tool stdio MCP server.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020), Anvil world integrity (MCS021), server.properties/JVM preflight (MCS022), plugin JAR bytecode inspector (MCS023), and a built-in 15-tool stdio MCP server.
       </p>
     </div>
   </header>
 
   <div class="tabs">
     <button class="tab-btn active" id="tabBuilderBtn" onclick="switchTab('builder')">1. Scenario Matrix &amp; CI Workflow Builder</button>
-    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS020)</button>
+    <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS023)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
     <button class="tab-btn" id="tabRconBtn" onclick="switchTab('rcon')">4. RCON Wire &amp; Fault Injection Lab</button>
-    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. MCP Server &amp; Report Comparator (MCS020)</button>
+    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 15-Tool MCP Server &amp; Report Comparator (MCS020)</button>
+    <button class="tab-btn" id="tabPreflightBtn" onclick="switchTab('preflight')">6. Config Preflight (MCS022) &amp; CI RAM Calculator</button>
   </div>
 
   <main>
@@ -580,26 +581,76 @@
       </div>
       <div class="card">
         <h2>
-          <span>MCS020 Verdict &amp; 6-Tool Stdio MCP Config</span>
+          <span>MCS020 Verdict &amp; 15-Tool Stdio MCP Config</span>
           <button class="btn" onclick="copyText('mcpCfgOut')">Copy MCP Config</button>
         </h2>
         <div id="cmpVerdict" class="status-box status-ok" style="margin-bottom:12px;">Click Compare Reports to diff baseline vs current.</div>
         <pre id="cmpMdOut" style="margin-bottom:14px; max-height:180px;"></pre>
-        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code>)</label>
+        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code> — 15 Tools)</label>
         <pre id="mcpCfgOut">{
   "mcpServers": {
     "mcstage": {
       "command": "java",
-      "args": ["-jar", "mcstage-0.9.0.jar", "mcp"]
+      "args": ["-jar", "mcstage-0.21.0.jar", "mcp"]
     }
   }
 }</pre>
       </div>
     </section>
+
+    <section id="preflightSection" class="grid hidden">
+      <div class="card">
+        <h2>
+          <span>Server Config &amp; JVM Preflight Linter (MCS022)</span>
+          <button class="btn btn-primary" onclick="runBrowserPreflight()">Run Preflight</button>
+        </h2>
+        <label for="pfProps"><code>server.properties</code></label>
+        <textarea id="pfProps" rows="8" oninput="runBrowserPreflight()" style="width:100%;font-family:var(--mono);font-size:12px;background:#090d16;color:#d9e5ff;border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;">online-mode=false
+server-ip=0.0.0.0
+enable-rcon=true
+rcon.password=123456
+sync-chunk-writes=true
+view-distance=14
+simulation-distance=10
+network-compression-threshold=256</textarea>
+        <label for="pfJvm">JVM Startup Flags (space-separated)</label>
+        <input type="text" id="pfJvm" value="-Xms1G -Xmx2G" oninput="runBrowserPreflight()" style="margin-bottom:10px;" />
+        <div id="pfVerdict" class="status-box status-ok">Grade A</div>
+        <pre id="pfOut" style="max-height:220px;"></pre>
+      </div>
+      <div class="card">
+        <h2>
+          <span>CI Matrix RAM &amp; Shard Budget Calculator</span>
+          <button class="btn" onclick="runMatrixCalc()">Recalculate</button>
+        </h2>
+        <div class="row">
+          <div>
+            <label for="mcCases">Total Matrix Cases (platforms &times; versions)</label>
+            <input type="number" id="mcCases" min="1" max="32" value="6" oninput="runMatrixCalc()" />
+          </div>
+          <div>
+            <label for="mcHeapGb">JVM Heap per Server (GB)</label>
+            <input type="number" id="mcHeapGb" min="1" max="16" step="0.5" value="2" oninput="runMatrixCalc()" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="mcHostGb">CI Runner RAM (GB, e.g. 7 for ubuntu-latest)</label>
+            <input type="number" id="mcHostGb" min="2" max="64" step="0.5" value="7" oninput="runMatrixCalc()" />
+          </div>
+          <div>
+            <label for="mcMaxShards">Max Parallel GitHub Shards</label>
+            <input type="number" id="mcMaxShards" min="1" max="16" value="3" oninput="runMatrixCalc()" />
+          </div>
+        </div>
+        <div id="mcCalcVerdict" class="status-box status-ok" style="margin-bottom:10px;"></div>
+        <pre id="mcCalcOut" style="max-height:260px;"></pre>
+      </div>
+    </section>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.9.0 · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.21.0 · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
   </footer>
 
   <script>
@@ -717,12 +768,91 @@
       document.getElementById("labSection").classList.toggle("hidden", which !== "lab");
       document.getElementById("rconSection").classList.toggle("hidden", which !== "rcon");
       document.getElementById("cmpSection").classList.toggle("hidden", which !== "cmp");
+      document.getElementById("preflightSection").classList.toggle("hidden", which !== "preflight");
       document.getElementById("tabBuilderBtn").classList.toggle("active", which === "builder");
       document.getElementById("tabSimBtn").classList.toggle("active", which === "sim");
       document.getElementById("tabLabBtn").classList.toggle("active", which === "lab");
       document.getElementById("tabRconBtn").classList.toggle("active", which === "rcon");
       document.getElementById("tabCmpBtn").classList.toggle("active", which === "cmp");
+      document.getElementById("tabPreflightBtn").classList.toggle("active", which === "preflight");
       if (which === "cmp") runBrowserCompare();
+      if (which === "preflight") { runBrowserPreflight(); runMatrixCalc(); }
+    }
+
+    function runBrowserPreflight() {
+      const raw = document.getElementById("pfProps").value || "";
+      const jvm = (document.getElementById("pfJvm").value || "").trim().split(/\s+/).filter(Boolean);
+      const props = {};
+      for (const line of raw.split(/\r?\n/)) {
+        const t = line.trim();
+        if (!t || t.startsWith("#") || t.startsWith("!")) continue;
+        const idx = t.indexOf("=");
+        if (idx > 0) props[t.slice(0, idx).trim().toLowerCase()] = t.slice(idx + 1).trim();
+      }
+      const issues = [];
+      const ip = (props["server-ip"] || "").trim();
+      const loop = ip === "127.0.0.1" || ip === "::1" || ip.toLowerCase() === "localhost";
+      if ((props["online-mode"] || "").toLowerCase() === "false" && !loop) {
+        issues.push({ code: "CFG-001", sev: "error", msg: `online-mode=false on non-loopback server-ip='${ip || "0.0.0.0"}'. Bind 127.0.0.1 behind Velocity.` });
+      }
+      if ((props["enable-rcon"] || "").toLowerCase() === "true") {
+        const pw = props["rcon.password"] || "";
+        if (pw.length < 10 || pw === "123456" || pw.toLowerCase() === "password") {
+          issues.push({ code: "CFG-002", sev: "error", msg: "Weak/short rcon.password (<10 chars) with enable-rcon=true." });
+        } else if (!loop) {
+          issues.push({ code: "CFG-002", sev: "warning", msg: "Plaintext Source RCON exposed on non-loopback address." });
+        }
+      }
+      if ((props["sync-chunk-writes"] || "").toLowerCase() === "true") {
+        issues.push({ code: "CFG-003", sev: "note", msg: "sync-chunk-writes=true causes synchronous fsync tick spikes; set false on Paper/Folia." });
+      }
+      if (parseInt(props["view-distance"] || "8", 10) > 12) {
+        issues.push({ code: "CFG-004", sev: "warning", msg: `view-distance=${props["view-distance"]} > 12 multiplies chunk RAM quadratically.` });
+      }
+      if (jvm.length > 0 && !jvm.some((f) => /Use(G1|Z|Shenandoah)GC/i.test(f))) {
+        issues.push({ code: "CFG-006", sev: "warning", msg: "JVM flags lack explicit -XX:+UseG1GC or -XX:+UseZGC -XX:+ZGenerational." });
+      }
+      const xms = jvm.find((f) => f.startsWith("-Xms"));
+      const xmx = jvm.find((f) => f.startsWith("-Xmx"));
+      if (xms && xmx && xms.slice(4) !== xmx.slice(4)) {
+        issues.push({ code: "CFG-006", sev: "note", msg: `Mismatched heap (${xms} vs ${xmx}); match -Xms and -Xmx to avoid resize pauses.` });
+      }
+      const pen = issues.reduce((a, i) => a + (i.sev === "error" ? 25 : i.sev === "warning" ? 12 : 4), 0);
+      const score = Math.max(0, 100 - pen);
+      const grade = score >= 90 ? "A" : score >= 78 ? "B" : score >= 62 ? "C" : score >= 45 ? "D" : "F";
+      const ok = !issues.some((i) => i.sev === "error");
+      const vEl = document.getElementById("pfVerdict");
+      vEl.className = "status-box " + (ok ? "status-ok" : "status-err");
+      vEl.textContent = `MCS022 Preflight: Grade ${grade} (${score}/100) — ${issues.length} finding(s) [${ok ? "PASS" : "FAIL"}]`;
+      document.getElementById("pfOut").textContent = issues.length
+        ? issues.map((i) => `[${i.sev.toUpperCase()}] ${i.code}: ${i.msg}`).join("\n")
+        : "PASS: Zero configuration or JVM flag hazards detected!";
+    }
+
+    function runMatrixCalc() {
+      const cases = Math.max(1, parseInt(document.getElementById("mcCases").value || "6", 10));
+      const heap = Math.max(0.5, parseFloat(document.getElementById("mcHeapGb").value || "2"));
+      const host = Math.max(2, parseFloat(document.getElementById("mcHostGb").value || "7"));
+      const maxShards = Math.max(1, parseInt(document.getElementById("mcMaxShards").value || "3", 10));
+      const totalMemPerJvm = heap + 0.65;
+      const safeFits = totalMemPerJvm <= (host - 1.0);
+      const shards = Math.min(cases, maxShards);
+      const serialSec = cases * 42;
+      const parallelSec = Math.ceil(cases / shards) * 42;
+      const vEl = document.getElementById("mcCalcVerdict");
+      vEl.className = "status-box " + (safeFits ? "status-ok" : "status-err");
+      vEl.textContent = safeFits
+        ? `SAFE: ${shards} shard(s) · ~${parallelSec}s wall-clock (vs ${serialSec}s serial, ${Math.round((1 - parallelSec / serialSec) * 100)}% faster)`
+        : `OOM RISK: ${totalMemPerJvm.toFixed(2)} GB JVM footprint exceeds ${(host - 1.0).toFixed(1)} GB safe runner budget!`;
+      document.getElementById("mcCalcOut").textContent = [
+        `Matrix Cases       : ${cases}`,
+        `Per-JVM Footprint  : ${heap.toFixed(1)} GB heap + 0.65 GB metaspace/OS = ${totalMemPerJvm.toFixed(2)} GB`,
+        `Recommended Shards : ${shards} (max ${Math.ceil(cases / shards)} case(s)/shard)`,
+        `Estimated Serial   : ${serialSec}s`,
+        `Estimated Sharded  : ${parallelSec}s`,
+        `CLI Preflight Cmd  : java -jar mcstage-0.21.0.jar preflight ./server --jvm-arg -Xms${heap}G --jvm-arg -Xmx${heap}G --jvm-arg -XX:+UseG1GC`,
+        `CLI JAR Audit Cmd  : java -jar mcstage-0.21.0.jar inspect-jar build/libs/plugin.jar --folia`
+      ].join("\n");
     }
 
     function runBrowserCompare() {

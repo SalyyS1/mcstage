@@ -1,5 +1,6 @@
 package com.salyvn.mcstage.mcp
 
+import com.github.ajalt.clikt.core.parse
 import com.salyvn.mcstage.protocol.MinecraftSlpProbe
 import com.salyvn.mcstage.run.ScenarioFile
 import com.salyvn.mcstage.run.Step
@@ -439,5 +440,32 @@ class McpServerAndBotProbeTest {
         assertEquals(6, payload["case_count"]!!.jsonPrimitive.int)
         assertEquals(3, payload["recommended_shards"]!!.jsonPrimitive.int)
         assertTrue(payload["estimated_parallel_seconds"]!!.jsonPrimitive.int < payload["estimated_serial_seconds"]!!.jsonPrimitive.int)
+    }
+
+    @Test
+    fun `cli inspect-jar and preflight subcommands parse and execute cleanly`(@TempDir dir: Path) {
+        val props = dir.resolve("server.properties")
+        Files.writeString(
+            props,
+            "online-mode=true\nserver-ip=127.0.0.1\nview-distance=8\nsimulation-distance=6\nsync-chunk-writes=false\n",
+            StandardCharsets.UTF_8,
+        )
+        com.salyvn.mcstage.cli.PreflightCommand().parse(
+            listOf(dir.toString(), "--jvm-arg", "-Xms2G", "--jvm-arg", "-Xmx2G", "--jvm-arg", "-XX:+UseG1GC", "--json"),
+        )
+
+        val jar = dir.resolve("cli-plugin.jar")
+        java.util.zip.ZipOutputStream(Files.newOutputStream(jar)).use { zos ->
+            zos.putNextEntry(java.util.zip.ZipEntry("paper-plugin.yml"))
+            zos.write(
+                "name: CliTest\nversion: 1.0.0\nmain: com.salyvn.cli.Main\napi-version: '1.21.4'\nfolia-supported: true\n"
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
+            zos.closeEntry()
+            zos.putNextEntry(java.util.zip.ZipEntry("com/salyvn/cli/Main.class"))
+            zos.write(byteArrayOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte(), 0x00, 0x00, 0x00, 65))
+            zos.closeEntry()
+        }
+        com.salyvn.mcstage.cli.InspectJarCommand().parse(listOf(jar.toString(), "--folia", "--json"))
     }
 }
