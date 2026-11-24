@@ -63,6 +63,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_generate_github_action",
                 "mcstage_render_step_summary",
                 "mcstage_export_world_sarif",
+                "mcstage_export_preflight_sarif",
                 "mcstage_list_rules",
             ),
             toolNames,

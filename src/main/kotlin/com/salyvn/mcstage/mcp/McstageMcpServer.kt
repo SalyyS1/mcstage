@@ -129,6 +129,7 @@ class McstageMcpServer {
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
                 "mcstage_render_step_summary" -> toolRenderStepSummary(args)
                 "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
+                "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -608,6 +609,67 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportPreflightSarif(args: JsonObject): JsonObject {
+        val propsText = args["server_properties"]?.jsonPrimitive?.contentOrNull
+        val serverDir = args["server_dir"]?.jsonPrimitive?.contentOrNull
+        val jvmFlags = (args["jvm_flags"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?: emptyList()
+        val report = when {
+            propsText != null -> com.salyvn.mcstage.instance.ConfigPreflight.audit(propsText, jvmFlags)
+            !serverDir.isNullOrBlank() -> com.salyvn.mcstage.instance.ConfigPreflight.auditDirectory(java.nio.file.Path.of(serverDir), jvmFlags)
+            else -> throw IllegalArgumentException("Provide either 'server_properties' text or 'server_dir' path.")
+        }
+        val sarifDoc = buildJsonObject {
+            put("\$schema", "https://json.schemastore.org/sarif-2.1.0.json")
+            put("version", "2.1.0")
+            putJsonArray("runs") {
+                add(buildJsonObject {
+                    putJsonObject("tool") {
+                        putJsonObject("driver") {
+                            put("name", BuildInfo.NAME)
+                            put("version", BuildInfo.version)
+                            putJsonArray("rules") {
+                                add(buildJsonObject {
+                                    put("id", "MCS022")
+                                    put("name", "ServerConfigPreflightViolation")
+                                    putJsonObject("shortDescription") {
+                                        put("text", "Minecraft server.properties or JVM flag security/performance hazard")
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    putJsonArray("results") {
+                        for (f in report.issues) {
+                            add(buildJsonObject {
+                                put("ruleId", "MCS022")
+                                put("level", if (f.severity.equals("error", ignoreCase = true) || f.severity.equals("critical", ignoreCase = true)) "error" else "warning")
+                                putJsonObject("message") { put("text", "[${f.code}] ${f.key}: ${f.message}") }
+                                putJsonArray("locations") {
+                                    add(buildJsonObject {
+                                        putJsonObject("physicalLocation") {
+                                            putJsonObject("artifactLocation") {
+                                                put("uri", "server.properties")
+                                            }
+                                        }
+                                    })
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+        }
+        return buildJsonObject {
+            put("ok", report.ok)
+            put("grade", report.grade)
+            put("score", report.score)
+            put("finding_count", report.issues.size)
+            put("sarif", sarifDoc)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -641,6 +703,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
         add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
         add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
+        add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -720,6 +783,11 @@ class McstageMcpServer {
                     "mcstage_export_world_sarif" -> {
                         putJsonObject("world_dir") { put("type", "string") }
                         putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
+                    }
+                    "mcstage_export_preflight_sarif" -> {
+                        putJsonObject("server_properties") { put("type", "string") }
+                        putJsonObject("server_dir") { put("type", "string") }
+                        putJsonObject("jvm_flags") { put("type", "array") }
                     }
                 }
             }
