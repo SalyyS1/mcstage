@@ -31,11 +31,12 @@ object ScenarioFile {
     private val STEP_ACTIONS = setOf(
         "expect", "not-expect", "send", "wait", "enabled", "file-exists", "file-not-exists", "file-contains",
         "inject-lag", "no-barrier-stall", "assert-heap", "assert-region-recovery", "rcon-fault",
-        "bot-probe", "assert-bridge",
+        "bot-probe", "assert-bridge", "assert-world-integrity",
     )
 
     private val BOT_PROBE_KEYS = setOf("max-latency", "protocol", "expect-version", "expect-motd", "port", "timeout")
     private val ASSERT_BRIDGE_KEYS = setOf("url", "token", "min-tps", "max-mspt", "max-errors", "player", "expect-gui-title", "timeout")
+    private val ASSERT_WORLD_KEYS = setOf("world", "require-session-lock-cleared")
 
     private val ASSERT_HEAP_KEYS = setOf("max-percent", "window")
     private val ASSERT_REGION_RECOVERY_KEYS = setOf(
@@ -291,6 +292,8 @@ object ScenarioFile {
                 step.containsKey("bot-probe") -> parseBotProbe(step, explicitTimeout, at)
 
                 step.containsKey("assert-bridge") -> parseAssertBridge(step, explicitTimeout, at)
+
+                step.containsKey("assert-world-integrity") -> parseAssertWorldIntegrity(step, at)
 
                 else -> throw SetupError(
                     "$at does not say what to do. Use one of: ${
@@ -699,6 +702,25 @@ object ScenarioFile {
             expectGuiTitle = expectGuiTitle,
             timeout = timeout,
         )
+    }
+
+    private fun parseAssertWorldIntegrity(step: Map<*, *>, at: String): Step.AssertWorldIntegrity {
+        val raw = step["assert-world-integrity"]
+        if (raw is String) {
+            return Step.AssertWorldIntegrity(worldDir = raw.trim().ifEmpty { "world" })
+        }
+        if (raw !is Map<*, *>) {
+            throw SetupError("$at: assert-world-integrity expects a world folder string or mapping (world, require-session-lock-cleared).")
+        }
+        for (k in raw.keys) {
+            val keyName = k.toString()
+            if (keyName !in ASSERT_WORLD_KEYS) {
+                throw SetupError("$at: assert-world-integrity has unknown key '$keyName'. Known keys: ${ASSERT_WORLD_KEYS.sorted().joinToString(", ")}.")
+            }
+        }
+        val worldDir = raw["world"]?.let { text(it, "assert-world-integrity.world", at) } ?: "world"
+        val reqCleared = raw["require-session-lock-cleared"]?.let { booleanFlag(it, "assert-world-integrity.require-session-lock-cleared", at) } ?: false
+        return Step.AssertWorldIntegrity(worldDir = worldDir, requireSessionLockCleared = reqCleared)
     }
 
     private fun ratio(node: Any?, what: String, where: String): Double? {

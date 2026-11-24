@@ -205,6 +205,18 @@ sealed interface Step {
                 append(")")
             }
     }
+
+    /**
+     * Audits a generated world directory inside the server instance (`world`, `world_nether`, etc.)
+     * for valid GZIP `level.dat` and 4096-byte-aligned Anvil `.mca` region headers (`MCS021`).
+     */
+    data class AssertWorldIntegrity(
+        val worldDir: String = "world",
+        val requireSessionLockCleared: Boolean = false,
+    ) : Step {
+        override val describe: String
+            get() = "assert world integrity ($worldDir)"
+    }
 }
 
 /** Ensures scenario file assertions never escape the server instance directory. */

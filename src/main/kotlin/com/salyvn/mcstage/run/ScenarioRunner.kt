@@ -337,6 +337,32 @@ class ScenarioRunner(
                     if (!stepRes.ok) overrideRuleId = "MCS019"
                     stepRes
                 }
+
+                is Step.AssertWorldIntegrity -> {
+                    val targetDir = instanceDir.resolve(step.worldDir).normalize()
+                    if (!targetDir.startsWith(instanceDir.normalize())) {
+                        overrideRuleId = "MCS021"
+                        StepResult(step.describe, ok = false, elapsed = took(), detail = "World path '${step.worldDir}' escapes server instance directory.")
+                    } else {
+                        val rep = WorldIntegrityChecker.inspect(targetDir, requireSessionLockCleared = step.requireSessionLockCleared)
+                        if (!rep.ok) {
+                            overrideRuleId = "MCS021"
+                            StepResult(
+                                step.describe,
+                                ok = false,
+                                elapsed = took(),
+                                detail = rep.issues.joinToString("; ") { "${it.code}: ${it.message}" },
+                            )
+                        } else {
+                            StepResult(
+                                step.describe,
+                                ok = true,
+                                elapsed = took(),
+                                matched = "level.dat OK, ${rep.regionFilesScanned} region(s), ${rep.validChunkHeaders} chunk header(s)",
+                            )
+                        }
+                    }
+                }
             }
 
             steps += result
