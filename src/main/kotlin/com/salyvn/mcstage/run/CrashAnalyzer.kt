@@ -210,6 +210,15 @@ object CrashAnalyzer {
             help = "Inspect plugins/MCKitBridge telemetry and /api/v1/errors output to isolate plugin tick regressions or uncaught exceptions.",
             fatalForCrashGuard = true,
         ),
+        DiagnosticRule(
+            id = "MCS020",
+            name = "PerformanceRegressionDetected",
+            defaultSeverity = "error",
+            shortDescription = "Scenario outcome, elapsed duration, or diagnostic set regressed against baseline report",
+            fullDescription = "mcstage compare detected an outcome regression (passed -> failed/errored), an elapsed-time slowdown exceeding max-slowdown-pct, or newly introduced MCS diagnostic rules compared to the baseline JSON report.",
+            help = "Inspect the markdown or JSON diff from mcstage compare, profile newly added startup/tick work, and resolve new MCS findings before releasing.",
+            fatalForCrashGuard = true,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }

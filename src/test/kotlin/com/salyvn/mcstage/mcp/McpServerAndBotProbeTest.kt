@@ -50,6 +50,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_analyze_log",
                 "mcstage_plan_folia_topology",
                 "mcstage_generate_scenario",
+                "mcstage_compare_reports",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -61,7 +62,7 @@ class McpServerAndBotProbeTest {
         val rulesPayload = json.parseToJsonElement(
             rulesResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
         ).jsonObject
-        assertEquals(19, rulesPayload["rule_count"]!!.jsonPrimitive.int)
+        assertEquals(20, rulesPayload["rule_count"]!!.jsonPrimitive.int)
 
         val logResp = json.parseToJsonElement(
             server.handleMessage(
@@ -165,5 +166,55 @@ class McpServerAndBotProbeTest {
         assertTrue(valPayload["valid"]!!.jsonPrimitive.boolean)
         assertEquals(3, valPayload["case_count"]!!.jsonPrimitive.int)
         assertFalse(valResp["result"]!!.jsonObject["isError"]!!.jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `report comparator flags slowdown, outcome regression, and new diagnostics with MCS020`() {
+        val baseline = """
+            {
+              "scenario": "plugin-qa",
+              "cases": [
+                {"platform": "paper", "version": "26.3", "outcome": "passed", "elapsedMillis": 4000, "diagnostics": []},
+                {"platform": "folia", "version": "26.3", "outcome": "passed", "elapsedMillis": 5000, "diagnostics": []}
+              ]
+            }
+        """.trimIndent()
+        val current = """
+            {
+              "scenario": "plugin-qa",
+              "cases": [
+                {"platform": "paper", "version": "26.3", "outcome": "passed", "elapsedMillis": 6200, "diagnostics": []},
+                {"platform": "folia", "version": "26.3", "outcome": "failed", "elapsedMillis": 5100, "diagnostics": [{"ruleId": "MCS015"}]}
+              ]
+            }
+        """.trimIndent()
+        val result = com.salyvn.mcstage.report.ReportComparator.compare(baseline, current, maxSlowdownPercent = 25.0)
+        assertFalse(result.ok)
+        assertTrue(result.cases[0].durationRegressed)
+        assertTrue(result.cases[1].outcomeRegressed)
+        assertEquals(listOf("MCS015"), result.cases[1].newRules)
+        val sarif = com.salyvn.mcstage.report.ReportComparator.renderSarif(result)
+        assertTrue(sarif.contains("\"MCS020\""))
+
+        val server = McstageMcpServer()
+        val req = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(20))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_compare_reports"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("baseline_json", kotlinx.serialization.json.JsonPrimitive(baseline))
+                    put("current_json", kotlinx.serialization.json.JsonPrimitive(current))
+                    put("max_slowdown_pct", kotlinx.serialization.json.JsonPrimitive(25.0))
+                })
+            })
+        }
+        val cmpResp = json.parseToJsonElement(server.handleMessage(req.toString())!!).jsonObject
+        val cmpPayload = json.parseToJsonElement(
+            cmpResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertFalse(cmpPayload["ok"]!!.jsonPrimitive.boolean)
+        assertTrue(cmpPayload["markdown"]!!.jsonPrimitive.content.contains("REGRESSION DETECTED"))
     }
 }

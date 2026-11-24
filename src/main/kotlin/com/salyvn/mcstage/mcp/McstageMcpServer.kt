@@ -1,6 +1,7 @@
 package com.salyvn.mcstage.mcp
 
 import com.salyvn.mcstage.core.BuildInfo
+import com.salyvn.mcstage.report.ReportComparator
 import com.salyvn.mcstage.report.SarifRunReporter
 import com.salyvn.mcstage.run.BarrierStallAnalyzer
 import com.salyvn.mcstage.run.CaseResult
@@ -115,6 +116,7 @@ class McstageMcpServer {
                 "mcstage_analyze_log" -> toolAnalyzeLog(args)
                 "mcstage_plan_folia_topology" -> toolPlanFoliaTopology(args)
                 "mcstage_generate_scenario" -> toolGenerateScenario(args)
+                "mcstage_compare_reports" -> toolCompareReports(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -308,6 +310,20 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolCompareReports(args: JsonObject): JsonObject {
+        val baseline = args["baseline_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'baseline_json' string.")
+        val current = args["current_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'current_json' string.")
+        val maxSlowdown = args["max_slowdown_pct"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 25.0
+        val comparison = ReportComparator.compare(baseline, current, maxSlowdownPercent = maxSlowdown)
+        val base = ReportComparator.toJson(comparison)
+        return buildJsonObject {
+            for ((k, v) in base) put(k, v)
+            put("markdown", ReportComparator.renderMarkdown(comparison))
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -326,10 +342,11 @@ class McstageMcpServer {
 
     private fun toolDefinitions() = kotlinx.serialization.json.buildJsonArray {
         add(toolDef("mcstage_validate_scenario", "Validate an mcstage YAML scenario offline and expand its (platform, version) test matrix.", listOf("yaml")))
-        add(toolDef("mcstage_analyze_log", "Analyze Paper/Folia/Purpur console logs for MCS001-MCS019 crash, barrier stall, region recovery, and heap diagnostics with optional SARIF v2.1.0.", listOf("log")))
+        add(toolDef("mcstage_analyze_log", "Analyze Paper/Folia/Purpur console logs for MCS001-MCS020 crash, barrier stall, region recovery, and heap diagnostics with optional SARIF v2.1.0.", listOf("log")))
         add(toolDef("mcstage_plan_folia_topology", "Compute disjoint or merge-split Folia ThreadedRegionizer 16-chunk section anchor coordinates.", emptyList()))
         add(toolDef("mcstage_generate_scenario", "Generate a production-ready mcstage.yml with crash-guard, bot-probe, Folia stress, and heap checks.", emptyList()))
-        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS019) and crash-guard policies.", emptyList()))
+        add(toolDef("mcstage_compare_reports", "Compare baseline vs current mcstage JSON reports to flag outcome, boot/scenario latency, or diagnostic regressions (MCS020).", listOf("baseline_json", "current_json")))
+        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS020) and crash-guard policies.", emptyList()))
     }
 
     private fun toolDef(name: String, description: String, required: List<String>): JsonObject = buildJsonObject {
@@ -355,6 +372,11 @@ class McstageMcpServer {
                         putJsonObject("plugin_glob") { put("type", "string") }
                         putJsonObject("include_folia") { put("type", "boolean") }
                         putJsonObject("include_bot_probe") { put("type", "boolean") }
+                    }
+                    "mcstage_compare_reports" -> {
+                        putJsonObject("baseline_json") { put("type", "string") }
+                        putJsonObject("current_json") { put("type", "string") }
+                        putJsonObject("max_slowdown_pct") { put("type", "number") }
                     }
                 }
             }
