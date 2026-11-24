@@ -121,6 +121,7 @@ class McstageMcpServer {
                 "mcstage_doctor" -> toolDoctor(args)
                 "mcstage_probe_server" -> toolProbeServer(args)
                 "mcstage_aggregate_junit" -> toolAggregateJunit(args)
+                "mcstage_audit_server_config" -> toolAuditServerConfig(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -405,6 +406,20 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolAuditServerConfig(args: JsonObject): JsonObject {
+        val propsText = args["server_properties"]?.jsonPrimitive?.contentOrNull
+        val serverDir = args["server_dir"]?.jsonPrimitive?.contentOrNull
+        val jvmFlags = (args["jvm_flags"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?: emptyList()
+        val report = when {
+            propsText != null -> com.salyvn.mcstage.instance.ConfigPreflight.audit(propsText, jvmFlags)
+            !serverDir.isNullOrBlank() -> com.salyvn.mcstage.instance.ConfigPreflight.auditDirectory(java.nio.file.Path.of(serverDir), jvmFlags)
+            else -> throw IllegalArgumentException("Provide either 'server_properties' text or 'server_dir' path.")
+        }
+        return com.salyvn.mcstage.instance.ConfigPreflight.toJson(report)
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -431,7 +446,8 @@ class McstageMcpServer {
         add(toolDef("mcstage_doctor", "Inspect local Java 21+ runtime, JAR cache health, loopback port availability, and optional companion mckit-bridge-plugin readiness.", emptyList()))
         add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
         add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
-        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS021) and crash-guard policies.", emptyList()))
+        add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
+        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS022) and crash-guard policies.", emptyList()))
     }
 
     private fun toolDef(name: String, description: String, required: List<String>): JsonObject = buildJsonObject {
@@ -479,6 +495,11 @@ class McstageMcpServer {
                     "mcstage_aggregate_junit" -> {
                         putJsonObject("inputs") { put("type", "array") }
                         putJsonObject("name") { put("type", "string") }
+                    }
+                    "mcstage_audit_server_config" -> {
+                        putJsonObject("server_properties") { put("type", "string") }
+                        putJsonObject("server_dir") { put("type", "string") }
+                        putJsonObject("jvm_flags") { put("type", "array") }
                     }
                 }
             }

@@ -228,6 +228,15 @@ object CrashAnalyzer {
             help = "Inspect plugin chunk save hooks, async world mutations, and Paper/Folia shutdown handlers to prevent truncated region writes.",
             fatalForCrashGuard = true,
         ),
+        DiagnosticRule(
+            id = "MCS022",
+            name = "ServerConfigPreflightIssue",
+            defaultSeverity = "warning",
+            shortDescription = "Unsafe server.properties or suboptimal JVM startup flag configuration detected",
+            fullDescription = "ConfigPreflight detected exposed offline-mode bind settings, weak or exposed RCON credentials, sync-chunk-writes stalls, excessive view/simulation distances, or undersized/unmatched JVM heap & GC flags.",
+            help = "Harden server.properties (bind 127.0.0.1 behind proxy, strong RCON password, sync-chunk-writes=false) and configure matching -Xms/-Xmx with G1GC or Generational ZGC.",
+            fatalForCrashGuard = false,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }

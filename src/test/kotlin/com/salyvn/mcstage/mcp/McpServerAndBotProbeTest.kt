@@ -55,6 +55,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_doctor",
                 "mcstage_probe_server",
                 "mcstage_aggregate_junit",
+                "mcstage_audit_server_config",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -66,7 +67,7 @@ class McpServerAndBotProbeTest {
         val rulesPayload = json.parseToJsonElement(
             rulesResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
         ).jsonObject
-        assertEquals(21, rulesPayload["rule_count"]!!.jsonPrimitive.int)
+        assertEquals(22, rulesPayload["rule_count"]!!.jsonPrimitive.int)
 
         val logResp = json.parseToJsonElement(
             server.handleMessage(
@@ -307,5 +308,47 @@ class McpServerAndBotProbeTest {
         assertFalse(html.contains("<script>alert(1)</script>"))
         assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"))
         assertTrue(html.contains("PASS (1/1)"))
+    }
+
+    @Test
+    fun `config preflight audits server properties and jvm flags via MCS022 and MCP tool`() {
+        val props = """
+            online-mode=false
+            server-ip=0.0.0.0
+            enable-rcon=true
+            rcon.password=123456
+            sync-chunk-writes=true
+            view-distance=16
+            network-compression-threshold=1024
+        """.trimIndent()
+        val rep = com.salyvn.mcstage.instance.ConfigPreflight.audit(props, listOf("-Xms256M", "-Xmx512M"))
+        assertFalse(rep.ok)
+        assertTrue(rep.issues.any { it.code == "CFG-001" })
+        assertTrue(rep.issues.any { it.code == "CFG-002" })
+        assertTrue(rep.issues.any { it.code == "CFG-006" })
+
+        val server = McstageMcpServer()
+        val req = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(30))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_audit_server_config"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("server_properties", kotlinx.serialization.json.JsonPrimitive("online-mode=true\nserver-ip=127.0.0.1\nview-distance=8\nsimulation-distance=6\nsync-chunk-writes=false\nnetwork-compression-threshold=256\n"))
+                    put("jvm_flags", kotlinx.serialization.json.buildJsonArray {
+                        add(kotlinx.serialization.json.JsonPrimitive("-Xms2G"))
+                        add(kotlinx.serialization.json.JsonPrimitive("-Xmx2G"))
+                        add(kotlinx.serialization.json.JsonPrimitive("-XX:+UseG1GC"))
+                    })
+                })
+            })
+        }
+        val resp = json.parseToJsonElement(server.handleMessage(req.toString())!!).jsonObject
+        val payload = json.parseToJsonElement(
+            resp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(payload["ok"]!!.jsonPrimitive.boolean)
+        assertEquals("A", payload["grade"]!!.jsonPrimitive.content)
     }
 }
