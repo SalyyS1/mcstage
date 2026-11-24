@@ -25,6 +25,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -126,6 +127,7 @@ class McstageMcpServer {
                 "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
                 "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
+                "mcstage_render_step_summary" -> toolRenderStepSummary(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -511,6 +513,43 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolRenderStepSummary(args: JsonObject): JsonObject {
+        val raw = args["report_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'report_json' string.")
+        val root = json.parseToJsonElement(raw).jsonObject
+        val scenario = root["scenario"]?.jsonPrimitive?.contentOrNull ?: "mcstage"
+        val cases = root["cases"]?.jsonArray.orEmpty()
+        var passed = 0
+        val md = buildString {
+            val rows = buildString {
+                for (el in cases) {
+                    val obj = el.jsonObject
+                    val platform = obj["platform"]?.jsonPrimitive?.contentOrNull ?: "unknown"
+                    val version = obj["version"]?.jsonPrimitive?.contentOrNull ?: "?"
+                    val outcome = obj["outcome"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
+                    val elapsedMs = obj["elapsedMs"]?.jsonPrimitive?.contentOrNull ?: "0"
+                    val ok = outcome.equals("PASSED", ignoreCase = true)
+                    if (ok) passed++
+                    appendLine("| `$platform` | `$version` | **${if (ok) "PASS" else outcome.uppercase()}** | ${elapsedMs} ms |")
+                }
+            }
+            val verdict = if (passed == cases.size) "PASS" else "FAIL"
+            appendLine("## MCStage Real-Server Matrix Summary — `$verdict` ($passed/${cases.size})")
+            appendLine("- **Scenario:** `$scenario`")
+            appendLine()
+            appendLine("| Platform | Version | Outcome | Elapsed |")
+            appendLine("|---|---|---|---:|")
+            append(rows)
+        }
+        return buildJsonObject {
+            put("scenario", scenario)
+            put("passed", passed)
+            put("total", cases.size)
+            put("ok", passed == cases.size)
+            put("markdown", md)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -542,6 +581,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
+        add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -614,6 +654,9 @@ class McstageMcpServer {
                         putJsonObject("scenario_path") { put("type", "string") }
                         putJsonObject("build_tool") { put("type", "string") }
                         putJsonObject("include_sarif") { put("type", "boolean") }
+                    }
+                    "mcstage_render_step_summary" -> {
+                        putJsonObject("report_json") { put("type", "string") }
                     }
                 }
             }

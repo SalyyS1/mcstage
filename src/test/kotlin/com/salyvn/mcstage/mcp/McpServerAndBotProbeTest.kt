@@ -61,6 +61,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_render_comparison_html",
                 "mcstage_estimate_matrix_budget",
                 "mcstage_generate_github_action",
+                "mcstage_render_step_summary",
                 "mcstage_list_rules",
             ),
             toolNames,
