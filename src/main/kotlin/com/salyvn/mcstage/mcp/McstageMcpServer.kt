@@ -119,6 +119,7 @@ class McstageMcpServer {
                 "mcstage_compare_reports" -> toolCompareReports(args)
                 "mcstage_check_world_integrity" -> toolCheckWorldIntegrity(args)
                 "mcstage_doctor" -> toolDoctor(args)
+                "mcstage_probe_server" -> toolProbeServer(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -365,6 +366,29 @@ class McstageMcpServer {
         return com.salyvn.mcstage.core.DoctorCheck.toJson(report)
     }
 
+    private fun toolProbeServer(args: JsonObject): JsonObject {
+        val host = args["host"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { "127.0.0.1" } ?: "127.0.0.1"
+        val port = (args["port"]?.jsonPrimitive?.intOrNull ?: 25565).coerceIn(1, 65535)
+        val timeoutMs = (args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 3000).coerceIn(200, 10000)
+        val res = com.salyvn.mcstage.protocol.MinecraftSlpProbe.probe(
+            host = host,
+            port = port,
+            timeout = Duration.ofMillis(timeoutMs.toLong()),
+        )
+        return buildJsonObject {
+            put("reachable", res.reachable)
+            put("host", host)
+            put("port", port)
+            put("latency_ms", res.latencyMillis)
+            res.versionName?.let { put("version_name", it) }
+            res.protocolVersion?.let { put("protocol_version", it) }
+            res.onlinePlayers?.let { put("online_players", it) }
+            res.maxPlayers?.let { put("max_players", it) }
+            res.motd?.let { put("motd", it) }
+            res.error?.let { put("error", it) }
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -389,6 +413,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_compare_reports", "Compare baseline vs current mcstage JSON reports to flag outcome, boot/scenario latency, or diagnostic regressions (MCS020).", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_check_world_integrity", "Audit a Minecraft world directory (level.dat GZIP header, session.lock, and Anvil .mca 4096-byte sector alignment & chunk pointers, MCS021).", listOf("world_dir")))
         add(toolDef("mcstage_doctor", "Inspect local Java 21+ runtime, JAR cache health, loopback port availability, and optional companion mckit-bridge-plugin readiness.", emptyList()))
+        add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS021) and crash-guard policies.", emptyList()))
     }
 
@@ -428,6 +453,11 @@ class McstageMcpServer {
                     "mcstage_doctor" -> {
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("bridge_url") { put("type", "string") }
+                    }
+                    "mcstage_probe_server" -> {
+                        putJsonObject("host") { put("type", "string") }
+                        putJsonObject("port") { put("type", "integer") }
+                        putJsonObject("timeout_ms") { put("type", "integer") }
                     }
                 }
             }
