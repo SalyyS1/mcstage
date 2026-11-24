@@ -51,11 +51,12 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.24.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.25.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.24.0.jar init --preset rpg-bot-bridge  # starter presets: basic, folia-stress, rpg-bot-bridge, ci-matrix
-java -jar mcstage-0.24.0.jar probe 127.0.0.1 --port 25565 --json  # pure-JVM Minecraft Java SLP status & latency probe (MCS018)
+java -jar mcstage-0.25.0.jar init --preset rpg-bot-bridge  # starter presets: basic, folia-stress, rpg-bot-bridge, ci-matrix
+java -jar mcstage-0.25.0.jar budget mcstage.yml --host-ram-gb 7 --max-shards 4  # estimate CI peak RAM, cache & shards
+java -jar mcstage-0.25.0.jar probe 127.0.0.1 --port 25565 --json  # pure-JVM Minecraft Java SLP status & latency probe (MCS018)
 java -jar mcstage-0.24.0.jar inspect-jar build/libs/app.jar --folia --json  # pre-boot plugin.yml/paper-plugin.yml & JVM bytecode audit (MCS023)
 java -jar mcstage-0.23.0.jar preflight ./server --jvm-arg -Xms2G --jvm-arg -Xmx2G --jvm-arg -XX:+UseG1GC  # server.properties & JVM audit (MCS022)
 java -jar mcstage-0.23.0.jar check-world ./server/world --require-unlocked --json  # offline Anvil .mca & level.dat integrity check (MCS021)

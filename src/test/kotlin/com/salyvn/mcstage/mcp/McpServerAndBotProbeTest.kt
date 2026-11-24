@@ -484,6 +484,9 @@ class McpServerAndBotProbeTest {
             assertTrue(Files.isRegularFile(out))
             val parsed = ScenarioFile.read(out)
             assertTrue(parsed.steps.isNotEmpty(), "preset $preset should contain steps")
+            if (preset == "ci-matrix") {
+                com.salyvn.mcstage.cli.BudgetCommand().parse(listOf(out.toString(), "--host-ram-gb", "7.0", "--max-shards", "3", "--json"))
+            }
         }
 
         // Verify ProbeCommand against a real local loopback SLP socket
