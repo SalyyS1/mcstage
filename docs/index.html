@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.43.0 | Real-Server Plugin Matrix Builder, 23-Tool MCP, Folia SVG Topology &amp; Doctor HTML</title>
-  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.26.0 YAML scenarios: GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator (mcstage budget), headless SLP probe (mcstage probe), init presets, pre-boot plugin JAR inspector (MCS023), preflight auditor (MCS022), world integrity checker (MCS021), 15-tool stdio MCP server, SARIF v2.1.0, and JUnit XML aggregation." />
+  <title>mcstage v0.44.0 | Real-Server Plugin Matrix Builder, 24-Tool MCP, JAR/Folia/Doctor HTML &amp; SARIF</title>
+  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.44.0 YAML scenarios: GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator (mcstage budget), headless SLP probe (mcstage probe), init presets, pre-boot plugin JAR inspector (MCS023 + HTML/SARIF), preflight auditor (MCS022), world integrity checker (MCS021), Folia SVG topology (--html), 24-tool stdio MCP server, SARIF v2.1.0, and JUnit XML aggregation." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -287,7 +287,7 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.24.0 | 15-Tool Stdio MCP · probe, check-world, inspect-jar &amp; preflight CLI · 4 Init Presets · MCS001-MCS023</span>
+        <span class="badge">mcstage v0.44.0 | 24-Tool Stdio MCP · Folia SVG, Doctor &amp; JAR HTML · probe, check-world &amp; preflight CLI · MCS001-MCS023</span>
         <div class="navlinks">
           <a href="https://salyys1.github.io/minecraftkit/showcase.html">MinecraftKit Suite</a>
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
@@ -296,7 +296,7 @@
       </div>
       <h1>MCStage Real-Server Plugin Matrix Builder, MCP Server, Preflight &amp; Regression Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020), Anvil world integrity (MCS021), server.properties/JVM preflight (MCS022), plugin JAR bytecode inspector (MCS023), and a built-in 15-tool stdio MCP server.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020), Anvil world integrity (MCS021), server.properties/JVM preflight (MCS022), plugin JAR bytecode inspector (MCS023 + HTML/SARIF), and a built-in 24-tool stdio MCP server.
       </p>
     </div>
   </header>
@@ -306,7 +306,7 @@
     <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS023)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
     <button class="tab-btn" id="tabRconBtn" onclick="switchTab('rcon')">4. RCON Wire &amp; Fault Injection Lab</button>
-    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 15-Tool MCP Server &amp; Report Comparator (MCS020)</button>
+    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 24-Tool MCP Server &amp; Report Comparator (MCS020)</button>
     <button class="tab-btn" id="tabPreflightBtn" onclick="switchTab('preflight')">6. Config Preflight (MCS022) &amp; CI RAM Calculator</button>
   </div>
 
@@ -581,7 +581,7 @@
       </div>
       <div class="card">
         <h2>
-          <span>MCS020 Verdict &amp; 15-Tool Stdio MCP Config</span>
+          <span>MCS020 Verdict &amp; 24-Tool Stdio MCP Config</span>
           <button class="btn" onclick="copyText('mcpCfgOut')">Copy MCP Config</button>
         </h2>
         <div id="cmpVerdict" class="status-box status-ok" style="margin-bottom:12px;">Click Compare Reports to diff baseline vs current.</div>

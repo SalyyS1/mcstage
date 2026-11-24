@@ -37,10 +37,15 @@ class InspectJarCommand : CliktCommand(name = "inspect-jar") {
     private val hostJava by option("--java-major", help = "Target host JVM feature version (default: current JVM)").int()
         .default(Runtime.version().feature())
     private val sarifOut by option("--sarif", help = "Write OASIS SARIF v2.1.0 MCS023 report to path").path()
+    private val htmlOut by option("--html", help = "Write a self-contained dark-mode HTML plugin JAR audit report").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
         val report = PluginJarInspector.inspect(jarPath, targetFolia = folia, hostJavaMajor = hostJava)
+        htmlOut?.let { hp ->
+            hp.parent?.let { Files.createDirectories(it) }
+            Files.writeString(hp, PluginJarInspector.renderHtml(report), StandardCharsets.UTF_8)
+        }
         sarifOut?.let { sp ->
             val diags = report.issues.map { iss ->
                 DiagnosticFinding(

@@ -201,4 +201,36 @@ object PluginJarInspector {
             }
         }
     }
+
+    private fun htmlEsc(raw: String): String = raw
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+
+    /** Render a self-contained dark-mode HTML Plugin JAR Inspection Report (`inspect-jar --html`). */
+    fun renderHtml(rep: InspectionReport): String {
+        val statusCol = if (rep.ok) "#22c55e" else "#ef4444"
+        val issuesHtml = if (rep.issues.isEmpty()) {
+            """<tr><td colspan="4" style="color:#22c55e"><b>PASS &mdash; Zero MCS023 packaging or bytecode issues detected.</b></td></tr>"""
+        } else {
+            rep.issues.joinToString("\n") { iss ->
+                val c = if (iss.severity.equals("error", ignoreCase = true)) "#ef4444" else "#f59e0b"
+                """<tr><td><code>${htmlEsc(iss.code)}</code></td><td><code>${htmlEsc(iss.ruleId)}</code></td><td style="color:$c"><b>${htmlEsc(iss.severity.uppercase())}</b></td><td>${htmlEsc(iss.message)}</td></tr>"""
+            }
+        }
+        return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>mcstage Plugin JAR Inspection (${htmlEsc(rep.pluginName ?: "plugin")})</title>
+<style>
+body{margin:0;padding:28px;background:#0b0f17;color:#e6edf7;font-family:system-ui,sans-serif}
+.wrap{max-width:960px;margin:0 auto}.card{background:#121826;border:1px solid #26324d;border-radius:10px;padding:18px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #1e293b;text-align:left}
+th{color:#93a4c3}code{font-family:ui-monospace,monospace;color:#38bdf8}
+</style></head><body><div class="wrap">
+<div class="card"><h1>mcstage Pre-Boot Plugin JAR Audit (MCS023)</h1>
+<p>Status: <b style="color:$statusCol">${if (rep.ok) "PASS" else "FAIL"}</b> &middot; Plugin: <b>${htmlEsc(rep.pluginName ?: "unknown")} ${htmlEsc(rep.pluginVersion ?: "")}</b> &middot; Descriptor: <code>${htmlEsc(rep.descriptorType)}</code> &middot; Java Bytecode: <b>${rep.mainClassJavaMajor ?: "?"}</b> &middot; Folia Supported: <b>${rep.foliaSupported}</b></p>
+<p>JAR: <code>${htmlEsc(rep.jarPath)}</code> &middot; Main Class: <code>${htmlEsc(rep.mainClass ?: "(missing)")}</code> (present=${rep.mainClassPresent})</p></div>
+<div class="card"><table><thead><tr><th>Code</th><th>Rule</th><th>Severity</th><th>Message</th></tr></thead>
+<tbody>$issuesHtml</tbody></table></div></div></body></html>"""
+    }
 }
