@@ -124,6 +124,7 @@ class McstageMcpServer {
                 "mcstage_audit_server_config" -> toolAuditServerConfig(args)
                 "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
                 "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
+                "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -449,6 +450,23 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolEstimateMatrixBudget(args: JsonObject): JsonObject {
+        val yamlText = args["yaml"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'yaml' string.")
+        val hostRamGb = args["host_ram_gb"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 7.0
+        val maxShards = (args["max_shards"]?.jsonPrimitive?.intOrNull ?: 4).coerceIn(1, 16)
+        val temp = Files.createTempFile("mcstage-est-", ".yml")
+        return try {
+            Files.writeString(temp, yamlText, StandardCharsets.UTF_8)
+            val scenario = ScenarioFile.read(temp)
+            com.salyvn.mcstage.run.MatrixEstimator.toJson(
+                com.salyvn.mcstage.run.MatrixEstimator.estimate(scenario, hostRamGb = hostRamGb, maxShards = maxShards),
+            )
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -478,6 +496,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
         add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
+        add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -540,6 +559,11 @@ class McstageMcpServer {
                         putJsonObject("baseline_json") { put("type", "string") }
                         putJsonObject("current_json") { put("type", "string") }
                         putJsonObject("max_slowdown_pct") { put("type", "number") }
+                    }
+                    "mcstage_estimate_matrix_budget" -> {
+                        putJsonObject("yaml") { put("type", "string") }
+                        putJsonObject("host_ram_gb") { put("type", "number") }
+                        putJsonObject("max_shards") { put("type", "integer") }
                     }
                 }
             }

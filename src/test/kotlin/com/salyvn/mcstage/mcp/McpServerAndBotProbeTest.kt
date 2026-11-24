@@ -58,6 +58,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_audit_server_config",
                 "mcstage_inspect_plugin_jar",
                 "mcstage_render_comparison_html",
+                "mcstage_estimate_matrix_budget",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -402,5 +403,40 @@ class McpServerAndBotProbeTest {
         assertEquals("SampleRPG", payload["plugin_name"]!!.jsonPrimitive.content)
         assertEquals(21, payload["main_class_java_major"]!!.jsonPrimitive.int)
         assertTrue(payload["folia_supported"]!!.jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun `matrix estimator budgets RAM, cache, and CI shards for mcstage yaml`() {
+        val yaml = """
+            name: Multi-Platform CI Matrix
+            platforms: [paper, folia, purpur]
+            versions: ["1.21.4", "latest"]
+            memory: 2G
+            steps:
+              - enabled: MyPlugin
+              - bot-probe:
+                  max-latency: 400ms
+        """.trimIndent()
+        val server = McstageMcpServer()
+        val req = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(32))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_estimate_matrix_budget"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("yaml", kotlinx.serialization.json.JsonPrimitive(yaml))
+                    put("host_ram_gb", kotlinx.serialization.json.JsonPrimitive(7.0))
+                    put("max_shards", kotlinx.serialization.json.JsonPrimitive(3))
+                })
+            })
+        }
+        val resp = json.parseToJsonElement(server.handleMessage(req.toString())!!).jsonObject
+        val payload = json.parseToJsonElement(
+            resp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals(6, payload["case_count"]!!.jsonPrimitive.int)
+        assertEquals(3, payload["recommended_shards"]!!.jsonPrimitive.int)
+        assertTrue(payload["estimated_parallel_seconds"]!!.jsonPrimitive.int < payload["estimated_serial_seconds"]!!.jsonPrimitive.int)
     }
 }
