@@ -485,5 +485,44 @@ class McpServerAndBotProbeTest {
             val parsed = ScenarioFile.read(out)
             assertTrue(parsed.steps.isNotEmpty(), "preset $preset should contain steps")
         }
+
+        // Verify ProbeCommand against a real local loopback SLP socket
+        ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
+            val port = ss.localPort
+            val worker = thread(isDaemon = true) {
+                ss.accept().use { sock ->
+                    val input = sock.getInputStream()
+                    // Drain handshake + status request headers quickly
+                    val buf = ByteArray(128)
+                    input.read(buf)
+                    val jsonBytes = """{"version":{"name":"Paper 1.21.4","protocol":769},"players":{"max":20,"online":1},"description":{"text":"MCStage Probe"}}"""
+                        .toByteArray(StandardCharsets.UTF_8)
+                    val payload = ByteArrayOutputStream().apply {
+                        write(0x00) // status response id
+                        // varint json length
+                        var v = jsonBytes.size
+                        while (true) {
+                            if ((v and 0x7F.inv()) == 0) { write(v); break }
+                            write((v and 0x7F) or 0x80)
+                            v = v ushr 7
+                        }
+                        write(jsonBytes)
+                    }.toByteArray()
+                    val frame = ByteArrayOutputStream().apply {
+                        var v = payload.size
+                        while (true) {
+                            if ((v and 0x7F.inv()) == 0) { write(v); break }
+                            write((v and 0x7F) or 0x80)
+                            v = v ushr 7
+                        }
+                        write(payload)
+                    }.toByteArray()
+                    sock.getOutputStream().write(frame)
+                    sock.getOutputStream().flush()
+                }
+            }
+            com.salyvn.mcstage.cli.ProbeCommand().parse(listOf("127.0.0.1", "--port", port.toString(), "--json"))
+            worker.join(3000)
+        }
     }
 }
