@@ -496,6 +496,17 @@ class McpServerAndBotProbeTest {
         assertTrue(wfText.contains("~/.mcstage"))
         com.salyvn.mcstage.cli.ListRulesCommand().parse(listOf("--json"))
 
+        val sampleLog = dir.resolve("latest.log")
+        val sarifOut = dir.resolve("latest.sarif")
+        Files.writeString(
+            sampleLog,
+            "[12:00:01 ERROR]: Thread failed main thread check: Cannot modify world asynchronously\n",
+            StandardCharsets.UTF_8,
+        )
+        com.salyvn.mcstage.cli.AnalyzeLogCommand().parse(listOf(sampleLog.toString(), "--sarif", sarifOut.toString(), "--json"))
+        val sarifText = Files.readString(sarifOut, StandardCharsets.UTF_8)
+        assertTrue(sarifText.contains("\"MCS003\""))
+
         // Verify ProbeCommand against a real local loopback SLP socket
         ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
             val port = ss.localPort

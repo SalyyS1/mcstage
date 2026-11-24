@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.options.versionOption
 import com.salyvn.mcstage.cli.AggregateCommand
+import com.salyvn.mcstage.cli.AnalyzeLogCommand
 import com.salyvn.mcstage.cli.BudgetCommand
 import com.salyvn.mcstage.cli.CacheCommand
 import com.salyvn.mcstage.cli.CheckWorldCommand
@@ -60,6 +61,7 @@ fun main(args: Array<String>) = McstageCli()
         BudgetCommand(),
         GithubActionCommand(),
         ListRulesCommand(),
+        AnalyzeLogCommand(),
         McpCommand(),
     )
     .main(args)
