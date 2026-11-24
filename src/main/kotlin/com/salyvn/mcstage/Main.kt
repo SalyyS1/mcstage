@@ -12,8 +12,10 @@ import com.salyvn.mcstage.cli.CheckWorldCommand
 import com.salyvn.mcstage.cli.CompareCommand
 import com.salyvn.mcstage.cli.CreateCommand
 import com.salyvn.mcstage.cli.DoctorCommand
+import com.salyvn.mcstage.cli.GithubActionCommand
 import com.salyvn.mcstage.cli.InitCommand
 import com.salyvn.mcstage.cli.InspectJarCommand
+import com.salyvn.mcstage.cli.ListRulesCommand
 import com.salyvn.mcstage.cli.McpCommand
 import com.salyvn.mcstage.cli.PreflightCommand
 import com.salyvn.mcstage.cli.ProbeCommand
@@ -56,6 +58,8 @@ fun main(args: Array<String>) = McstageCli()
         CheckWorldCommand(),
         ProbeCommand(),
         BudgetCommand(),
+        GithubActionCommand(),
+        ListRulesCommand(),
         McpCommand(),
     )
     .main(args)

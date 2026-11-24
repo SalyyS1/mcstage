@@ -489,6 +489,13 @@ class McpServerAndBotProbeTest {
             }
         }
 
+        val workflowOut = dir.resolve("mcstage-ci.yml")
+        com.salyvn.mcstage.cli.GithubActionCommand().parse(listOf("mcstage.yml", "--build-tool", "gradle", "-o", workflowOut.toString()))
+        val wfText = Files.readString(workflowOut, StandardCharsets.UTF_8)
+        assertTrue(wfText.contains("upload-sarif@v3"))
+        assertTrue(wfText.contains("~/.mcstage"))
+        com.salyvn.mcstage.cli.ListRulesCommand().parse(listOf("--json"))
+
         // Verify ProbeCommand against a real local loopback SLP socket
         ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
             val port = ss.localPort
