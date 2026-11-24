@@ -237,6 +237,15 @@ object CrashAnalyzer {
             help = "Harden server.properties (bind 127.0.0.1 behind proxy, strong RCON password, sync-chunk-writes=false) and configure matching -Xms/-Xmx with G1GC or Generational ZGC.",
             fatalForCrashGuard = false,
         ),
+        DiagnosticRule(
+            id = "MCS023",
+            name = "PluginJarPreflightViolation",
+            defaultSeverity = "error",
+            shortDescription = "Plugin JAR descriptor missing, main class absent, Folia flag missing, or Java bytecode too new",
+            fullDescription = "PluginJarInspector detected a missing/malformed paper-plugin.yml or plugin.yml, missing compiled main class inside the JAR, unsupported Java classfile major version, or missing folia-supported: true before server boot.",
+            help = "Fix build shading/packaging so plugin.yml/paper-plugin.yml and the compiled main class exist inside the JAR, set Java 21 toolchain, and declare folia-supported: true for Folia runs.",
+            fatalForCrashGuard = true,
+        ),
     )
 
     private val RULES_BY_ID: Map<String, DiagnosticRule> = RULES.associateBy { it.id }

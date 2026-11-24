@@ -122,6 +122,7 @@ class McstageMcpServer {
                 "mcstage_probe_server" -> toolProbeServer(args)
                 "mcstage_aggregate_junit" -> toolAggregateJunit(args)
                 "mcstage_audit_server_config" -> toolAuditServerConfig(args)
+                "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -420,6 +421,17 @@ class McstageMcpServer {
         return com.salyvn.mcstage.instance.ConfigPreflight.toJson(report)
     }
 
+    private fun toolInspectPluginJar(args: JsonObject): JsonObject {
+        val jarPath = args["jar_path"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { null }
+            ?: throw IllegalArgumentException("Missing required 'jar_path' string.")
+        val targetFolia = args["target_folia"]?.jsonPrimitive?.booleanOrNull ?: false
+        val rep = com.salyvn.mcstage.instance.PluginJarInspector.inspect(
+            java.nio.file.Path.of(jarPath),
+            targetFolia = targetFolia,
+        )
+        return com.salyvn.mcstage.instance.PluginJarInspector.toJson(rep)
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -447,7 +459,8 @@ class McstageMcpServer {
         add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
         add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
         add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
-        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS022) and crash-guard policies.", emptyList()))
+        add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
+        add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
     private fun toolDef(name: String, description: String, required: List<String>): JsonObject = buildJsonObject {
@@ -500,6 +513,10 @@ class McstageMcpServer {
                         putJsonObject("server_properties") { put("type", "string") }
                         putJsonObject("server_dir") { put("type", "string") }
                         putJsonObject("jvm_flags") { put("type", "array") }
+                    }
+                    "mcstage_inspect_plugin_jar" -> {
+                        putJsonObject("jar_path") { put("type", "string") }
+                        putJsonObject("target_folia") { put("type", "boolean") }
                     }
                 }
             }

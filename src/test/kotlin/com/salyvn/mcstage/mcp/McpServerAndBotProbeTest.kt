@@ -56,6 +56,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_probe_server",
                 "mcstage_aggregate_junit",
                 "mcstage_audit_server_config",
+                "mcstage_inspect_plugin_jar",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -67,7 +68,7 @@ class McpServerAndBotProbeTest {
         val rulesPayload = json.parseToJsonElement(
             rulesResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
         ).jsonObject
-        assertEquals(22, rulesPayload["rule_count"]!!.jsonPrimitive.int)
+        assertEquals(23, rulesPayload["rule_count"]!!.jsonPrimitive.int)
 
         val logResp = json.parseToJsonElement(
             server.handleMessage(
@@ -350,5 +351,52 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertTrue(payload["ok"]!!.jsonPrimitive.boolean)
         assertEquals("A", payload["grade"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `plugin jar inspector verifies manifest, main class bytecode version, and folia support`(@TempDir dir: Path) {
+        val jar = dir.resolve("sample-plugin.jar")
+        java.util.zip.ZipOutputStream(Files.newOutputStream(jar)).use { zos ->
+            zos.putNextEntry(java.util.zip.ZipEntry("paper-plugin.yml"))
+            zos.write(
+                """
+                name: SampleRPG
+                version: 1.0.0
+                main: com.salyvn.sample.SamplePlugin
+                api-version: '1.21.4'
+                folia-supported: true
+                dependencies:
+                  server:
+                    Vault: {}
+                """.trimIndent().toByteArray(StandardCharsets.UTF_8),
+            )
+            zos.closeEntry()
+            // Synthetic classfile header: CAFEBABE minor=0 major=65 (Java 21)
+            zos.putNextEntry(java.util.zip.ZipEntry("com/salyvn/sample/SamplePlugin.class"))
+            zos.write(byteArrayOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte(), 0x00, 0x00, 0x00, 65))
+            zos.closeEntry()
+        }
+
+        val server = McstageMcpServer()
+        val req = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(31))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_inspect_plugin_jar"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("jar_path", kotlinx.serialization.json.JsonPrimitive(jar.toString()))
+                    put("target_folia", kotlinx.serialization.json.JsonPrimitive(true))
+                })
+            })
+        }
+        val resp = json.parseToJsonElement(server.handleMessage(req.toString())!!).jsonObject
+        val payload = json.parseToJsonElement(
+            resp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(payload["ok"]!!.jsonPrimitive.boolean)
+        assertEquals("SampleRPG", payload["plugin_name"]!!.jsonPrimitive.content)
+        assertEquals(21, payload["main_class_java_major"]!!.jsonPrimitive.int)
+        assertTrue(payload["folia_supported"]!!.jsonPrimitive.boolean)
     }
 }
