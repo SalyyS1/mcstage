@@ -29,7 +29,7 @@ class InspectJarCommand : CliktCommand(name = "inspect-jar") {
     override fun run() {
         val report = PluginJarInspector.inspect(jarPath, targetFolia = folia, hostJavaMajor = hostJava)
         if (json) {
-            echo(Json { prettyPrint = true }.encodeToString(PluginJarInspector.toJson(report)))
+            echo(PRETTY_JSON.encodeToString(PluginJarInspector.toJson(report)))
         } else {
             echo("Plugin JAR Inspection (${report.descriptorType}): ${if (report.ok) "PASS" else "FAIL"}")
             echo("  JAR       : ${report.jarPath}")
@@ -46,5 +46,9 @@ class InspectJarCommand : CliktCommand(name = "inspect-jar") {
         if (!report.ok) {
             throw ProgramResult(1)
         }
+    }
+
+    private companion object {
+        val PRETTY_JSON = Json { prettyPrint = true }
     }
 }

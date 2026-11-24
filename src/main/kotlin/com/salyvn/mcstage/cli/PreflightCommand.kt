@@ -34,7 +34,7 @@ class PreflightCommand : CliktCommand(name = "preflight") {
         }
 
         if (json) {
-            echo(Json { prettyPrint = true }.encodeToString(ConfigPreflight.toJson(report)))
+            echo(PRETTY_JSON.encodeToString(ConfigPreflight.toJson(report)))
         } else {
             echo("Server Config Preflight (MCS022): Grade ${report.grade} (${report.score}/100) — ${if (report.ok) "PASS" else "FAIL"}")
             echo("  Properties parsed: ${report.propertiesParsed} | JVM flags analyzed: ${report.jvmFlagsAnalyzed}")
@@ -50,5 +50,9 @@ class PreflightCommand : CliktCommand(name = "preflight") {
         if (!report.ok) {
             throw ProgramResult(1)
         }
+    }
+
+    private companion object {
+        val PRETTY_JSON = Json { prettyPrint = true }
     }
 }

@@ -467,5 +467,15 @@ class McpServerAndBotProbeTest {
             zos.closeEntry()
         }
         com.salyvn.mcstage.cli.InspectJarCommand().parse(listOf(jar.toString(), "--folia", "--json"))
+
+        val world = dir.resolve("test-world")
+        Files.createDirectories(world.resolve("region"))
+        // Minimal valid GZIP header (18+ bytes)
+        val gzipHeader = ByteArray(20)
+        gzipHeader[0] = 0x1F
+        gzipHeader[1] = 0x8B.toByte()
+        Files.write(world.resolve("level.dat"), gzipHeader)
+        Files.write(world.resolve("region/r.0.0.mca"), ByteArray(8192))
+        com.salyvn.mcstage.cli.CheckWorldCommand().parse(listOf(world.toString(), "--require-unlocked", "--json"))
     }
 }

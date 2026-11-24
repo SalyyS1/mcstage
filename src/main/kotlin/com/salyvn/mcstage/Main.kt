@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.options.versionOption
 import com.salyvn.mcstage.cli.AggregateCommand
 import com.salyvn.mcstage.cli.CacheCommand
+import com.salyvn.mcstage.cli.CheckWorldCommand
 import com.salyvn.mcstage.cli.CompareCommand
 import com.salyvn.mcstage.cli.CreateCommand
 import com.salyvn.mcstage.cli.DoctorCommand
@@ -50,6 +51,7 @@ fun main(args: Array<String>) = McstageCli()
         DoctorCommand(),
         InspectJarCommand(),
         PreflightCommand(),
+        CheckWorldCommand(),
         McpCommand(),
     )
     .main(args)
