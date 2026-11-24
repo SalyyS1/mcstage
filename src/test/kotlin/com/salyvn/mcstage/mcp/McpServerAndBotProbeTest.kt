@@ -477,5 +477,13 @@ class McpServerAndBotProbeTest {
         Files.write(world.resolve("level.dat"), gzipHeader)
         Files.write(world.resolve("region/r.0.0.mca"), ByteArray(8192))
         com.salyvn.mcstage.cli.CheckWorldCommand().parse(listOf(world.toString(), "--require-unlocked", "--json"))
+
+        for (preset in listOf("basic", "folia-stress", "rpg-bot-bridge", "ci-matrix")) {
+            val out = dir.resolve("preset-$preset.yml")
+            com.salyvn.mcstage.cli.InitCommand().parse(listOf(out.toString(), "--preset", preset))
+            assertTrue(Files.isRegularFile(out))
+            val parsed = ScenarioFile.read(out)
+            assertTrue(parsed.steps.isNotEmpty(), "preset $preset should contain steps")
+        }
     }
 }

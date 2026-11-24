@@ -80,8 +80,9 @@ class FoliaRecoveryAndRconFaultTest {
             requireRecoveryOnFault = false,
         )
         assertNotNull(loopRes.violation)
-        assertEquals(FoliaCrashRecoveryAnalyzer.Kind.CRASH_LOOP_EXCEEDED, loopRes.violation!!.kind)
-        assertEquals("section(1,1)", loopRes.violation!!.regionKey)
+        val viol = loopRes.violation!!
+        assertEquals(FoliaCrashRecoveryAnalyzer.Kind.CRASH_LOOP_EXCEEDED, viol.kind)
+        assertEquals("section(1,1)", viol.regionKey)
 
         val findings = CrashAnalyzer.analyze(crashLoop)
         assertTrue(findings.any { it.ruleId == "MCS015" }, findings.toString())

@@ -51,18 +51,18 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.22.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.23.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.22.0.jar init                          # generates starter mcstage.yml
-java -jar mcstage-0.22.0.jar inspect-jar build/libs/app.jar --folia --json  # pre-boot plugin.yml/paper-plugin.yml & JVM bytecode audit (MCS023)
-java -jar mcstage-0.22.0.jar preflight ./server --jvm-arg -Xms2G --jvm-arg -Xmx2G --jvm-arg -XX:+UseG1GC  # server.properties & JVM audit (MCS022)
-java -jar mcstage-0.22.0.jar check-world ./server/world --require-unlocked --json  # offline Anvil .mca & level.dat integrity check (MCS021)
-java -jar mcstage-0.22.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, bridge GUI, regex, matrix, and Java check
-java -jar mcstage-0.22.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --html build/reports/matrix.html --sarif mcstage.sarif
-java -jar mcstage-0.22.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --html diff.html --sarif diff.sarif
-java -jar mcstage-0.22.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
-java -jar mcstage-0.22.0.jar mcp                           # run as a 15-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
+java -jar mcstage-0.23.0.jar init --preset rpg-bot-bridge  # starter presets: basic, folia-stress, rpg-bot-bridge, ci-matrix
+java -jar mcstage-0.23.0.jar inspect-jar build/libs/app.jar --folia --json  # pre-boot plugin.yml/paper-plugin.yml & JVM bytecode audit (MCS023)
+java -jar mcstage-0.23.0.jar preflight ./server --jvm-arg -Xms2G --jvm-arg -Xmx2G --jvm-arg -XX:+UseG1GC  # server.properties & JVM audit (MCS022)
+java -jar mcstage-0.23.0.jar check-world ./server/world --require-unlocked --json  # offline Anvil .mca & level.dat integrity check (MCS021)
+java -jar mcstage-0.23.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, bridge GUI, regex, matrix, and Java check
+java -jar mcstage-0.23.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --html build/reports/matrix.html --sarif mcstage.sarif
+java -jar mcstage-0.23.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --html diff.html --sarif diff.sarif
+java -jar mcstage-0.23.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.23.0.jar mcp                           # run as a 15-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
 ```
 
 ## Writing a Scenario (`mcstage.yml`)

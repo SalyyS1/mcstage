@@ -105,7 +105,7 @@ object ReportComparator {
             if (outcomeRegressed) {
                 reasons.add("Outcome regressed from passed to ${curr.outcome}")
             }
-            if (durationRegressed && deltaPct != null && base != null) {
+            if (durationRegressed && base != null) {
                 val pctStr = ((deltaPct * 10.0).roundToInt() / 10.0)
                 reasons.add("Elapsed time increased by +$pctStr% (${base.elapsedMs}ms -> ${curr.elapsedMs}ms, limit +$maxSlowdownPercent%)")
             }
