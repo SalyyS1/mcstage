@@ -24,6 +24,7 @@ class SummaryCommand : CliktCommand(name = "summary") {
 
     private val reportFile by argument("file", help = "Path to mcstage JSON report").path(mustExist = true, canBeDir = false)
     private val output by option("-o", "--output", help = "Optional output Markdown path (prints to stdout if omitted)").path()
+    private val badgeJson by option("--badge-json", help = "Optional path to write a shields.io Endpoint Badge JSON").path()
 
     override fun run() {
         val raw = Files.readString(reportFile, StandardCharsets.UTF_8)
@@ -50,6 +51,12 @@ class SummaryCommand : CliktCommand(name = "summary") {
             }
         }
         val verdict = if (passed == cases.size) "PASS" else "FAIL"
+        badgeJson?.let { bp ->
+            val color = if (passed == cases.size) "brightgreen" else "red"
+            val payload = """{"schemaVersion":1,"label":"mcstage matrix","message":"$verdict $passed/${cases.size}","color":"$color"}"""
+            bp.parent?.let { Files.createDirectories(it) }
+            Files.writeString(bp, payload, StandardCharsets.UTF_8)
+        }
         val md = buildString {
             appendLine("## MCStage Real-Server Matrix Summary — `$verdict` ($passed/${cases.size})")
             appendLine("- **Scenario:** `$scenario`")

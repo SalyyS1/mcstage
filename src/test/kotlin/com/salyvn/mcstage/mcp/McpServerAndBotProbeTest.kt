@@ -516,8 +516,10 @@ class McpServerAndBotProbeTest {
             """{"scenario":"MyRPG","cases":[{"platform":"paper","version":"1.21.4","outcome":"PASSED","elapsedMs":4200,"diagnostics":[]}]}""",
             StandardCharsets.UTF_8,
         )
-        com.salyvn.mcstage.cli.SummaryCommand().parse(listOf(repJson.toString(), "-o", sumMd.toString()))
+        val badgeOut = dir.resolve("mcstage-badge.json")
+        com.salyvn.mcstage.cli.SummaryCommand().parse(listOf(repJson.toString(), "-o", sumMd.toString(), "--badge-json", badgeOut.toString()))
         assertTrue(Files.readString(sumMd, StandardCharsets.UTF_8).contains("PASS` (1/1)"))
+        assertTrue(Files.readString(badgeOut, StandardCharsets.UTF_8).contains("\"brightgreen\""))
 
         // Verify ProbeCommand against a real local loopback SLP socket
         ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { ss ->
