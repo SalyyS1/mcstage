@@ -27,6 +27,7 @@ class DoctorCommand : CliktCommand(name = "doctor") {
     private val port by option("--port", help = "Preferred loopback server port to probe (default: 25565)").int().default(25565)
     private val scenario by option("--scenario", help = "Optional scenario YAML file to validate").path()
     private val bridgeUrl by option("--bridge-url", help = "Optional companion mckit-bridge-plugin URL (e.g. http://127.0.0.1:25590)")
+    private val htmlOut by option("--html", help = "Write a self-contained dark-mode HTML environment readiness report").path()
     private val badgeJson by option("--badge-json", help = "Write a shields.io Endpoint Badge JSON file summarizing readiness").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
@@ -37,6 +38,10 @@ class DoctorCommand : CliktCommand(name = "doctor") {
             scenarioFile = scenario,
             bridgeUrl = bridgeUrl,
         )
+        htmlOut?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            Files.writeString(target, DoctorCheck.renderHtml(report))
+        }
         badgeJson?.let { target ->
             target.parent?.let { Files.createDirectories(it) }
             val badge = buildJsonObject {

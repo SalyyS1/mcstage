@@ -179,4 +179,41 @@ object DoctorCheck {
             appendLine("  [${if (r.bridgeReachable == true) "OK" else "OFFLINE"}] Bridge: $it")
         }
     }
+
+    private fun htmlEsc(raw: String): String = raw
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+
+    /** Render a self-contained dark-mode HTML Environment Readiness Report for `mcstage doctor --html`. */
+    fun renderHtml(r: Report): String {
+        val statusColor = if (r.ok) "#22c55e" else "#ef4444"
+        val statusText = if (r.ok) "READY" else "ISSUES FOUND"
+        val scenRow = r.scenarioPath?.let { path ->
+            val ok = r.scenarioValid == true
+            """<tr><td>Scenario YAML</td><td style="color:${if (ok) "#22c55e" else "#ef4444"}"><b>${if (ok) "VALID" else "INVALID"}</b></td><td><code>${htmlEsc(path)}</code> &mdash; ${htmlEsc(r.scenarioDetail.orEmpty())}</td></tr>"""
+        }.orEmpty()
+        val bridgeRow = r.bridgeUrl?.let { url ->
+            val ok = r.bridgeReachable == true
+            """<tr><td>mckit-bridge-plugin</td><td style="color:${if (ok) "#22c55e" else "#f59e0b"}"><b>${if (ok) "REACHABLE" else "OFFLINE"}</b></td><td><code>${htmlEsc(url)}</code></td></tr>"""
+        }.orEmpty()
+        return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>mcstage doctor report (v${htmlEsc(r.mcstageVersion)})</title>
+<style>
+body{margin:0;padding:28px;background:#0b0f17;color:#e6edf7;font-family:system-ui,sans-serif}
+.wrap{max-width:920px;margin:0 auto}.card{background:#121826;border:1px solid #26324d;border-radius:10px;padding:18px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 10px;border-bottom:1px solid #1e293b;text-align:left}
+th{color:#93a4c3}code{font-family:ui-monospace,monospace;color:#38bdf8}
+</style></head><body><div class="wrap">
+<div class="card"><h1>mcstage Environment Readiness Report</h1>
+<p>Version: <code>v${htmlEsc(r.mcstageVersion)}</code> &middot; Status: <b style="color:$statusColor">$statusText</b></p></div>
+<div class="card"><table><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+<tr><td>Java Runtime (&ge; 21)</td><td style="color:${if (r.javaOk) "#22c55e" else "#ef4444"}"><b>${if (r.javaOk) "OK" else "FAIL"}</b></td><td>${htmlEsc(r.javaVersion)} (<code>${htmlEsc(r.javaBinary)}</code>)</td></tr>
+<tr><td>Loopback Port</td><td style="color:${if (r.portAvailable) "#22c55e" else "#f59e0b"}"><b>${if (r.portAvailable) "FREE" else "BUSY"}</b></td><td><code>127.0.0.1:${r.portChecked}</code></td></tr>
+<tr><td>Server JAR Cache</td><td style="color:#38bdf8"><b>${r.cachedJarCount} JAR(s)</b></td><td>${r.cachedTotalBytes / (1024 * 1024)} MiB at <code>${htmlEsc(r.cacheDir)}</code></td></tr>
+$scenRow
+$bridgeRow
+</tbody></table></div></div></body></html>"""
+    }
 }

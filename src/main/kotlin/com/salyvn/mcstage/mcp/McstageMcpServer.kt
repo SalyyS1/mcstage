@@ -132,6 +132,7 @@ class McstageMcpServer {
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
+                "mcstage_export_doctor_html" -> toolExportDoctorHtml(args)
                 "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
@@ -747,6 +748,19 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportDoctorHtml(args: JsonObject): JsonObject {
+        val port = args["port"]?.jsonPrimitive?.intOrNull ?: 25565
+        val bridgeUrl = args["bridge_url"]?.jsonPrimitive?.contentOrNull
+        val report = com.salyvn.mcstage.core.DoctorCheck.run(port = port, bridgeUrl = bridgeUrl)
+        val html = com.salyvn.mcstage.core.DoctorCheck.renderHtml(report)
+        return buildJsonObject {
+            put("ok", report.ok)
+            put("java_version", report.javaVersion)
+            put("html_bytes", html.length)
+            put("html", html)
+        }
+    }
+
     private fun toolExportSummaryBadge(args: JsonObject): JsonObject {
         val raw = args["report_json"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Missing required 'report_json' string.")
@@ -808,6 +822,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
+        add(toolDef("mcstage_export_doctor_html", "Run mcstage environment doctor and render a self-contained dark-mode HTML readiness report.", emptyList()))
         add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
@@ -898,7 +913,7 @@ class McstageMcpServer {
                         putJsonObject("jar_path") { put("type", "string") }
                         putJsonObject("target_folia") { put("type", "boolean") }
                     }
-                    "mcstage_export_doctor_badge" -> {
+                    "mcstage_export_doctor_badge", "mcstage_export_doctor_html" -> {
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("bridge_url") { put("type", "string") }
                     }
