@@ -131,6 +131,7 @@ class McstageMcpServer {
                 "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
+                "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -728,6 +729,23 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportDoctorBadge(args: JsonObject): JsonObject {
+        val port = (args["port"]?.jsonPrimitive?.intOrNull ?: 25565).coerceIn(1, 65535)
+        val bridgeUrl = args["bridge_url"]?.jsonPrimitive?.contentOrNull
+        val report = com.salyvn.mcstage.core.DoctorCheck.run(port = port, bridgeUrl = bridgeUrl)
+        val badge = buildJsonObject {
+            put("schemaVersion", 1)
+            put("label", "mcstage doctor")
+            put("message", if (report.ok) "READY (${report.javaVersion})" else "ISSUES")
+            put("color", if (report.ok) "brightgreen" else "red")
+        }
+        return buildJsonObject {
+            put("ok", report.ok)
+            put("java_version", report.javaVersion)
+            put("badge", badge)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -763,6 +781,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
+        add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -851,6 +870,10 @@ class McstageMcpServer {
                     "mcstage_export_jar_sarif" -> {
                         putJsonObject("jar_path") { put("type", "string") }
                         putJsonObject("target_folia") { put("type", "boolean") }
+                    }
+                    "mcstage_export_doctor_badge" -> {
+                        putJsonObject("port") { put("type", "integer") }
+                        putJsonObject("bridge_url") { put("type", "string") }
                     }
                 }
             }
