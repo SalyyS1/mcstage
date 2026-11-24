@@ -125,6 +125,8 @@ class McpServerAndBotProbeTest {
                   min-tps: 19.0
                   max-mspt: 35.0
                   max-errors: 0
+                  player: "MCKitTester"
+                  expect-gui-title: "RPG Shop"
             """.trimIndent(),
         )
         val scenario = ScenarioFile.read(file)
@@ -134,6 +136,8 @@ class McpServerAndBotProbeTest {
         val bridge = scenario.steps[2] as Step.AssertBridge
         assertEquals(19.0, bridge.minTps)
         assertEquals(0, bridge.maxErrors)
+        assertEquals("MCKitTester", bridge.player)
+        assertNotNull(bridge.expectGuiTitle)
     }
 
     @Test

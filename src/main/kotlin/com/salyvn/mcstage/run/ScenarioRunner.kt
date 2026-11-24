@@ -996,7 +996,17 @@ class ScenarioRunner(
             if (tps < step.minTps) failures += "tps_1m=$tps < ${step.minTps}"
             if (mspt > step.maxMspt) failures += "mspt=${mspt}ms > ${step.maxMspt}ms"
             if (errCount > step.maxErrors) failures += "severe_errors=$errCount > ${step.maxErrors}"
-            val summary = "tps=$tps mspt=${mspt}ms errors=$errCount"
+            var guiSuffix = ""
+            if (!step.player.isNullOrBlank() && step.expectGuiTitle != null) {
+                val encodedPlayer = java.net.URLEncoder.encode(step.player, java.nio.charset.StandardCharsets.UTF_8)
+                val guiObj = getJson("/api/v1/gui?player=$encodedPlayer")
+                val actualTitle = guiObj["title"]?.jsonPrimitive?.content.orEmpty()
+                if (!step.expectGuiTitle.matches(actualTitle)) {
+                    failures += "gui[${step.player}] title '$actualTitle' did not match ${step.expectGuiTitle.describe}"
+                }
+                guiSuffix = " gui_title=$actualTitle"
+            }
+            val summary = "tps=$tps mspt=${mspt}ms errors=$errCount$guiSuffix"
             if (failures.isNotEmpty()) {
                 StepResult(step.describe, ok = false, elapsed = took(), detail = failures.joinToString("; "), matched = summary)
             } else {

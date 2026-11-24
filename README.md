@@ -11,9 +11,9 @@ XML, Markdown CI summaries, or OASIS SARIF v2.1.0 reports. It downloads official
 digests (`SHA-256` / `MD5`) on both cache write and cache read, and reuses cached jars and worlds across runs:
 
 - **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Recovery, RCON Fault & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice & crash-loop recovery planner, deterministic SplitMix64 RCON latency/drop simulator, `MCS001`-`MCS020` crash/barrier/bot-probe/bridge/regression log analyzer, and multi-file JUnit XML aggregator).
-- **Built-In 6-Tool Stdio MCP Server (`mcstage mcp`):** Connect Claude Code, Cursor, Windsurf, Codex, or Antigravity directly to `java -jar mcstage-0.8.0.jar mcp` to validate scenarios offline, run `MCS001`-`MCS020` log + SARIF diagnostics, plan Folia region topologies, generate `mcstage.yml` suites, and diff baseline vs current reports (`mcstage_compare_reports`).
+- **Built-In 6-Tool Stdio MCP Server (`mcstage mcp`):** Connect Claude Code, Cursor, Windsurf, Codex, or Antigravity directly to `java -jar mcstage-0.9.0.jar mcp` to validate scenarios offline, run `MCS001`-`MCS020` log + SARIF diagnostics, plan Folia region topologies, generate `mcstage.yml` suites, and diff baseline vs current reports (`mcstage_compare_reports`).
 - **Baseline Regression Comparator (`mcstage compare` / `MCS020`):** Diff two `mcstage` JSON reports in CI to catch outcome regressions, boot/scenario elapsed-time slowdowns (`--max-slowdown-pct`), and newly introduced `MCSxxx` diagnostics with Markdown, JSON, and SARIF v2.1.0 outputs.
-- **Headless SLP Bot Probe (`bot-probe` / `MCS018`) & Companion Bridge Telemetry (`assert-bridge` / `MCS019`):** Verify live loopback Minecraft Java Edition TCP handshakes, latency, version/MOTD, and companion `mckit-bridge-plugin` TPS/MSPT/SEVERE error budgets without opening a desktop Minecraft client!
+- **Headless SLP Bot Probe (`bot-probe` / `MCS018`) & Companion Bridge Telemetry + Player GUI Checks (`assert-bridge` / `MCS019`):** Verify live loopback Minecraft Java Edition TCP handshakes, latency, version/MOTD, and companion `mckit-bridge-plugin` TPS/MSPT/SEVERE errors AND open player GUI titles (`player` + `expect-gui-title` via `/api/v1/gui`) without opening a desktop Minecraft client!
 
 ```
 $ mcstage test mcstage.yml --accept-eula --sarif build/reports/mcstage.sarif
@@ -50,15 +50,15 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.8.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.9.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.8.0.jar init                          # generates starter mcstage.yml
-java -jar mcstage-0.8.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, regex, matrix, and Java check
-java -jar mcstage-0.8.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --sarif mcstage.sarif
-java -jar mcstage-0.8.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --sarif diff.sarif
-java -jar mcstage-0.8.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
-java -jar mcstage-0.8.0.jar mcp                           # run as a 6-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
+java -jar mcstage-0.9.0.jar init                          # generates starter mcstage.yml
+java -jar mcstage-0.9.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, bridge GUI, regex, matrix, and Java check
+java -jar mcstage-0.9.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --sarif mcstage.sarif
+java -jar mcstage-0.9.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --sarif diff.sarif
+java -jar mcstage-0.9.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.9.0.jar mcp                           # run as a 6-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
 ```
 
 ## Writing a Scenario (`mcstage.yml`)

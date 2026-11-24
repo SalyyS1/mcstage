@@ -192,10 +192,18 @@ sealed interface Step {
         val minTps: Double = 18.0,
         val maxMspt: Double = 45.0,
         val maxErrors: Int = 0,
+        val player: String? = null,
+        val expectGuiTitle: LineMatcher? = null,
         val timeout: Duration = Duration.ofSeconds(3),
     ) : Step {
         override val describe: String
-            get() = "assert bridge telemetry (tps >= $minTps, mspt <= ${maxMspt}ms, errors <= $maxErrors)"
+            get() = buildString {
+                append("assert bridge telemetry (tps >= $minTps, mspt <= ${maxMspt}ms, errors <= $maxErrors")
+                if (!player.isNullOrBlank() && expectGuiTitle != null) {
+                    append(", gui[$player] matches ${expectGuiTitle.describe}")
+                }
+                append(")")
+            }
     }
 }
 

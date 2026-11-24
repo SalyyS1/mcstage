@@ -35,7 +35,7 @@ object ScenarioFile {
     )
 
     private val BOT_PROBE_KEYS = setOf("max-latency", "protocol", "expect-version", "expect-motd", "port", "timeout")
-    private val ASSERT_BRIDGE_KEYS = setOf("url", "token", "min-tps", "max-mspt", "max-errors", "timeout")
+    private val ASSERT_BRIDGE_KEYS = setOf("url", "token", "min-tps", "max-mspt", "max-errors", "player", "expect-gui-title", "timeout")
 
     private val ASSERT_HEAP_KEYS = setOf("max-percent", "window")
     private val ASSERT_REGION_RECOVERY_KEYS = setOf(
@@ -684,6 +684,10 @@ object ScenarioFile {
         val minTps = raw["min-tps"]?.toString()?.toDoubleOrNull() ?: 18.0
         val maxMspt = raw["max-mspt"]?.toString()?.toDoubleOrNull() ?: 45.0
         val maxErrors = integer(raw["max-errors"], "assert-bridge.max-errors", at) ?: 0
+        val player = raw["player"]?.let { text(it, "assert-bridge.player", at) }
+        val expectGuiTitle = raw["expect-gui-title"]?.let {
+            parseMatcher(text(it, "assert-bridge.expect-gui-title", at), "assert-bridge.expect-gui-title", at)
+        }
         val timeout = duration(raw["timeout"], "assert-bridge.timeout", at) ?: explicitTimeout ?: Duration.ofSeconds(3)
         return Step.AssertBridge(
             baseUrl = url.trimEnd('/'),
@@ -691,6 +695,8 @@ object ScenarioFile {
             minTps = minTps,
             maxMspt = maxMspt,
             maxErrors = maxErrors,
+            player = player,
+            expectGuiTitle = expectGuiTitle,
             timeout = timeout,
         )
     }
