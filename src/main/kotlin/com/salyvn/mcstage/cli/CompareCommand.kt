@@ -29,8 +29,13 @@ class CompareCommand : CliktCommand(name = "compare") {
 
     private val format by option(
         "--format",
-        help = "Output format: markdown, json, or sarif (default: markdown)",
-    ).choice("markdown", "json", "sarif").default("markdown")
+        help = "Output format: markdown, html, json, or sarif (default: markdown)",
+    ).choice("markdown", "html", "json", "sarif").default("markdown")
+
+    private val htmlOut by option(
+        "--html",
+        help = "Optional path to also write a self-contained dark-mode HTML diff report",
+    ).path()
 
     private val sarifOut by option(
         "--sarif",
@@ -56,7 +61,13 @@ class CompareCommand : CliktCommand(name = "compare") {
             Files.writeString(path, ReportComparator.renderSarif(result), StandardCharsets.UTF_8)
         }
 
+        htmlOut?.let { path ->
+            path.parent?.let { Files.createDirectories(it) }
+            Files.writeString(path, ReportComparator.renderHtml(result), StandardCharsets.UTF_8)
+        }
+
         val rendered = when (format) {
+            "html" -> ReportComparator.renderHtml(result)
             "json" -> ReportComparator.renderJson(result)
             "sarif" -> ReportComparator.renderSarif(result)
             else -> ReportComparator.renderMarkdown(result)

@@ -123,6 +123,7 @@ class McstageMcpServer {
                 "mcstage_aggregate_junit" -> toolAggregateJunit(args)
                 "mcstage_audit_server_config" -> toolAuditServerConfig(args)
                 "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
+                "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -432,6 +433,22 @@ class McstageMcpServer {
         return com.salyvn.mcstage.instance.PluginJarInspector.toJson(rep)
     }
 
+    private fun toolRenderComparisonHtml(args: JsonObject): JsonObject {
+        val baseline = args["baseline_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'baseline_json' string.")
+        val current = args["current_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'current_json' string.")
+        val maxSlowdown = args["max_slowdown_pct"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 25.0
+        val comparison = ReportComparator.compare(baseline, current, maxSlowdownPercent = maxSlowdown)
+        val html = ReportComparator.renderHtml(comparison)
+        return buildJsonObject {
+            put("ok", comparison.ok)
+            put("total_regressions", comparison.totalRegressions)
+            put("html_bytes", html.length)
+            put("html", html)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -460,6 +477,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
         add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
         add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
+        add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -517,6 +535,11 @@ class McstageMcpServer {
                     "mcstage_inspect_plugin_jar" -> {
                         putJsonObject("jar_path") { put("type", "string") }
                         putJsonObject("target_folia") { put("type", "boolean") }
+                    }
+                    "mcstage_render_comparison_html" -> {
+                        putJsonObject("baseline_json") { put("type", "string") }
+                        putJsonObject("current_json") { put("type", "string") }
+                        putJsonObject("max_slowdown_pct") { put("type", "number") }
                     }
                 }
             }

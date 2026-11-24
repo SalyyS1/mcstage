@@ -57,6 +57,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_aggregate_junit",
                 "mcstage_audit_server_config",
                 "mcstage_inspect_plugin_jar",
+                "mcstage_render_comparison_html",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -226,6 +227,9 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertFalse(cmpPayload["ok"]!!.jsonPrimitive.boolean)
         assertTrue(cmpPayload["markdown"]!!.jsonPrimitive.content.contains("REGRESSION DETECTED"))
+        val htmlDiff = com.salyvn.mcstage.report.ReportComparator.renderHtml(result)
+        assertTrue(htmlDiff.contains("<!doctype html>"))
+        assertTrue(htmlDiff.contains("REGRESSION DETECTED"))
     }
 
     @Test

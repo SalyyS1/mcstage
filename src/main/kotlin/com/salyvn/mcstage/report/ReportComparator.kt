@@ -195,6 +195,51 @@ object ReportComparator {
         return sb.toString()
     }
 
+    private fun htmlEsc(s: String): String =
+        s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+
+    fun renderHtml(result: ComparisonResult): String {
+        val badgeColor = if (result.ok) "#3fb950" else "#f85149"
+        val badgeLabel = if (result.ok) "PASS — ZERO REGRESSIONS" else "REGRESSION DETECTED (${result.totalRegressions})"
+        val rows = StringBuilder()
+        for (c in result.cases) {
+            val deltaStr = when {
+                c.elapsedDeltaMs == null -> "n/a"
+                c.elapsedDeltaPercent != null -> {
+                    val sign = if (c.elapsedDeltaMs >= 0) "+" else ""
+                    val pct = (c.elapsedDeltaPercent * 10.0).roundToInt() / 10.0
+                    "${sign}${c.elapsedDeltaMs}ms (${sign}${pct}%)"
+                }
+                else -> "${c.elapsedDeltaMs}ms"
+            }
+            val statusColor = if (c.hasRegression) "#f85149" else "#3fb950"
+            val rulesStr = if (c.newRules.isEmpty()) "none" else c.newRules.joinToString(", ")
+            rows.append(
+                "<tr><td><code>${htmlEsc(c.label)}</code></td>" +
+                    "<td>${htmlEsc(c.baselineOutcome ?: "new")}</td>" +
+                    "<td>${htmlEsc(c.currentOutcome)}</td>" +
+                    "<td>${htmlEsc(deltaStr)}</td>" +
+                    "<td><code>${htmlEsc(rulesStr)}</code></td>" +
+                    "<td style=\"color:$statusColor;font-weight:700\">${if (c.hasRegression) "REGRESSED" else "OK"}</td></tr>\n",
+            )
+        }
+        return """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>mcstage Baseline Regression Diff</title>
+<style>body{font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:24px}
+.wrap{max-width:940px;margin:0 auto}.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:18px;margin-bottom:16px}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:$badgeColor;color:#0b1116}
+table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1px solid #262c36;text-align:left;font-size:13px}th{color:#8b949e}</style>
+</head><body><div class="wrap">
+<div class="card"><h1>mcstage Baseline Regression Diff</h1>
+<p><span class="badge">$badgeLabel</span> &nbsp; ${htmlEsc(result.baselineScenario)} &rarr; ${htmlEsc(result.currentScenario)} (slowdown gate: +${result.maxSlowdownPercent}%)</p></div>
+<div class="card"><table><thead><tr><th>Target</th><th>Baseline</th><th>Current</th><th>Elapsed Delta</th><th>New Rules</th><th>Status</th></tr></thead>
+<tbody>$rows</tbody></table></div></div></body></html>"""
+    }
+
     fun renderSarif(result: ComparisonResult): String {
         val caseResults = result.cases.map { c ->
             val platform = Platform.entries.firstOrNull { it.id.equals(c.platform, ignoreCase = true) } ?: Platform.PAPER
