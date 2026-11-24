@@ -125,6 +125,7 @@ class McstageMcpServer {
                 "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
                 "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
                 "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
+                "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -467,6 +468,49 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolGenerateGithubAction(args: JsonObject): JsonObject {
+        val scenarioPath = args["scenario_path"]?.jsonPrimitive?.contentOrNull?.ifBlank { "mcstage.yml" } ?: "mcstage.yml"
+        val buildTool = args["build_tool"]?.jsonPrimitive?.contentOrNull?.lowercase() ?: "gradle"
+        val includeSarif = args["include_sarif"]?.jsonPrimitive?.booleanOrNull ?: true
+        val buildCmd = if (buildTool == "maven") "mvn -B package" else "./gradlew build --no-daemon"
+        val yaml = buildString {
+            appendLine("name: MCStage Real-Server Plugin QA")
+            appendLine("on: [push, pull_request]")
+            if (includeSarif) {
+                appendLine("permissions:")
+                appendLine("  contents: read")
+                appendLine("  security-events: write")
+            }
+            appendLine("jobs:")
+            appendLine("  mcstage-matrix:")
+            appendLine("    runs-on: ubuntu-latest")
+            appendLine("    steps:")
+            appendLine("      - uses: actions/checkout@v4")
+            appendLine("      - uses: actions/setup-java@v4")
+            appendLine("        with: { distribution: temurin, java-version: '21' }")
+            appendLine("      - uses: actions/cache@v4")
+            appendLine("        with: { path: ~/.mcstage, key: mcstage-jars-\${{ runner.os }}-\${{ hashFiles('$scenarioPath') }} }")
+            appendLine("      - name: Build plugin")
+            appendLine("        run: $buildCmd")
+            appendLine("      - name: Run mcstage real-server matrix")
+            appendLine("        run: java -jar mcstage.jar run $scenarioPath --format html --html mcstage-report.html --sarif mcstage.sarif")
+            appendLine("      - uses: actions/upload-artifact@v4")
+            appendLine("        if: always()")
+            appendLine("        with: { name: mcstage-html-report, path: mcstage-report.html }")
+            if (includeSarif) {
+                appendLine("      - uses: github/codeql-action/upload-sarif@v3")
+                appendLine("        if: always()")
+                appendLine("        with: { sarif_file: mcstage.sarif }")
+            }
+        }
+        return buildJsonObject {
+            put("filename", ".github/workflows/mcstage.yml")
+            put("scenario_path", scenarioPath)
+            put("build_tool", buildTool)
+            put("yaml", yaml)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -497,6 +541,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
+        add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -564,6 +609,11 @@ class McstageMcpServer {
                         putJsonObject("yaml") { put("type", "string") }
                         putJsonObject("host_ram_gb") { put("type", "number") }
                         putJsonObject("max_shards") { put("type", "integer") }
+                    }
+                    "mcstage_generate_github_action" -> {
+                        putJsonObject("scenario_path") { put("type", "string") }
+                        putJsonObject("build_tool") { put("type", "string") }
+                        putJsonObject("include_sarif") { put("type", "boolean") }
                     }
                 }
             }
