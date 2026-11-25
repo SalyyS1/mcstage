@@ -84,6 +84,8 @@ class McpServerAndBotProbeTest {
                 "mcstage_export_summary_badge",
                 "mcstage_export_rules_badge",
                 "mcstage_export_scenario_badge",
+                "mcstage_export_log_badge",
+                "mcstage_export_log_html",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -757,5 +759,50 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertTrue(sbPayload["valid"]!!.jsonPrimitive.boolean)
         assertEquals("brightgreen", sbPayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        // Verify v0.56.0 40-Tool Stdio MCP Milestone (mcstage_export_log_badge & mcstage_export_log_html)
+        val cleanLog = "[10:00:00 INFO]: Done (1.2s)! For help, type \"help\"\n"
+        val lbResp = json.parseToJsonElement(
+            mcp.handleMessage(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+                    put("id", kotlinx.serialization.json.JsonPrimitive(390))
+                    put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+                    put("params", kotlinx.serialization.json.buildJsonObject {
+                        put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_log_badge"))
+                        put("arguments", kotlinx.serialization.json.buildJsonObject {
+                            put("log", kotlinx.serialization.json.JsonPrimitive(cleanLog))
+                        })
+                    })
+                }.toString(),
+            )!!,
+        ).jsonObject
+        val lbPayload = json.parseToJsonElement(
+            lbResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(lbPayload["ok"]!!.jsonPrimitive.boolean)
+        assertEquals("brightgreen", lbPayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        val lhResp = json.parseToJsonElement(
+            mcp.handleMessage(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+                    put("id", kotlinx.serialization.json.JsonPrimitive(400))
+                    put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+                    put("params", kotlinx.serialization.json.buildJsonObject {
+                        put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_log_html"))
+                        put("arguments", kotlinx.serialization.json.buildJsonObject {
+                            put("log", kotlinx.serialization.json.JsonPrimitive("[10:00:01 ERROR]: java.lang.NullPointerException: <script>alert(1)</script>"))
+                        })
+                    })
+                }.toString(),
+            )!!,
+        ).jsonObject
+        val lhPayload = json.parseToJsonElement(
+            lhResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        val lhHtml = lhPayload["html"]!!.jsonPrimitive.content
+        assertTrue(lhHtml.contains("<!doctype html>"))
+        assertFalse(lhHtml.contains("<script>alert(1)</script>"))
     }
 }

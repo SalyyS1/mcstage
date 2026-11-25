@@ -150,6 +150,8 @@ class McstageMcpServer {
                 "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
                 "mcstage_export_rules_badge" -> toolExportRulesBadge()
                 "mcstage_export_scenario_badge" -> toolExportScenarioBadge(args)
+                "mcstage_export_log_badge" -> toolExportLogBadge(args)
+                "mcstage_export_log_html" -> toolExportLogHtml(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -1123,6 +1125,88 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportLogBadge(args: JsonObject): JsonObject {
+        val logText = args["log"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'log' string.")
+        val maxStallMs = args["max_stall_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 400L
+        val lines = logText.lines().mapIndexed { idx, line ->
+            LogLine(number = idx + 1, elapsedMillis = idx * 50L, text = line)
+        }
+        val crashFindings = CrashAnalyzer.analyze(lines)
+        val fatalCrash = CrashAnalyzer.firstCrashGuardFailure(crashFindings) != null
+        val barrierViolation = BarrierStallAnalyzer.detectViolation(lines, Duration.ofMillis(maxStallMs))
+        val ok = !fatalCrash && barrierViolation == null && crashFindings.isEmpty()
+        val labelMsg = when {
+            fatalCrash -> "CRASH (${crashFindings.size} findings)"
+            barrierViolation != null -> "BARRIER STALL"
+            crashFindings.isNotEmpty() -> "WARN (${crashFindings.size} findings)"
+            else -> "CLEAN (${lines.size} lines)"
+        }
+        val color = when {
+            fatalCrash || barrierViolation != null -> "red"
+            crashFindings.isNotEmpty() -> "yellow"
+            else -> "brightgreen"
+        }
+        val badge = buildJsonObject {
+            put("schemaVersion", 1)
+            put("label", "mcstage log")
+            put("message", labelMsg)
+            put("color", color)
+        }
+        return buildJsonObject {
+            put("ok", ok)
+            put("line_count", lines.size)
+            put("finding_count", crashFindings.size)
+            put("crash_guard_triggered", fatalCrash)
+            put("barrier_ok", barrierViolation == null)
+            put("badge", badge)
+        }
+    }
+
+    private fun toolExportLogHtml(args: JsonObject): JsonObject {
+        val logText = args["log"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'log' string.")
+        val maxStallMs = args["max_stall_ms"]?.jsonPrimitive?.intOrNull?.toLong() ?: 400L
+        val lines = logText.lines().mapIndexed { idx, line ->
+            LogLine(number = idx + 1, elapsedMillis = idx * 50L, text = line)
+        }
+        val crashFindings = CrashAnalyzer.analyze(lines)
+        val fatalCrash = CrashAnalyzer.firstCrashGuardFailure(crashFindings) != null
+        val barrierViolation = BarrierStallAnalyzer.detectViolation(lines, Duration.ofMillis(maxStallMs))
+        val peakHeapPct = HeapUsageAnalyzer.peakUsagePercent(lines.map { it.text })
+        val ok = !fatalCrash && barrierViolation == null && crashFindings.isEmpty()
+        fun esc(s: String): String = s
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+        val rows = if (crashFindings.isEmpty()) {
+            "<tr><td colspan=\"4\" style=\"color:#48e8b2\">No MCS001-MCS020 crash or warning signatures detected.</td></tr>"
+        } else {
+            crashFindings.joinToString("\n") { f ->
+                "<tr><td><code>${esc(f.ruleId)}</code></td><td>${esc(f.severity)}</td><td>${f.lineNumber ?: "-"}</td><td>${esc(f.message)}</td></tr>"
+            }
+        }
+        val html = """
+            <!doctype html>
+            <html lang="en"><head><meta charset="utf-8"><title>mcstage Log Audit</title>
+            <style>body{background:#0b1220;color:#e2e8f0;font-family:system-ui,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #1e293b;padding:8px;text-align:left}th{background:#111c32}</style>
+            </head><body>
+            <h1>mcstage Console Log Audit — ${if (ok) "CLEAN" else "ISSUES DETECTED"}</h1>
+            <p>Lines: ${lines.size} · Findings: ${crashFindings.size} · Crash-Guard: ${if (fatalCrash) "TRIGGERED" else "OK"} · Barrier: ${if (barrierViolation == null) "OK" else "STALLED"} · Peak Heap: ${peakHeapPct?.let { "$it%" } ?: "n/a"}</p>
+            <table><thead><tr><th>Rule</th><th>Severity</th><th>Line</th><th>Message</th></tr></thead><tbody>$rows</tbody></table>
+            </body></html>
+        """.trimIndent()
+        return buildJsonObject {
+            put("ok", ok)
+            put("line_count", lines.size)
+            put("finding_count", crashFindings.size)
+            put("crash_guard_triggered", fatalCrash)
+            put("html_bytes", html.length)
+            put("html", html)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -1177,6 +1261,8 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
         add(toolDef("mcstage_export_rules_badge", "Emit a shields.io Endpoint Badge JSON summarizing MCStage's OASIS SARIF v2.1.0 diagnostic rules (MCS001-MCS023).", emptyList()))
         add(toolDef("mcstage_export_scenario_badge", "Validate an mcstage YAML scenario offline and emit a shields.io Endpoint Badge JSON summarizing matrix validity and case count.", listOf("yaml")))
+        add(toolDef("mcstage_export_log_badge", "Analyze Paper/Folia/Purpur console logs for crash-guard & barrier violations and emit a shields.io Endpoint Badge JSON payload.", listOf("log")))
+        add(toolDef("mcstage_export_log_html", "Analyze Paper/Folia/Purpur console logs for MCS001-MCS020 diagnostics and render a self-contained dark-mode HTML Audit Report.", listOf("log")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -1188,7 +1274,7 @@ class McstageMcpServer {
             putJsonObject("properties") {
                 when (name) {
                     "mcstage_validate_scenario", "mcstage_export_scenario_badge" -> putJsonObject("yaml") { put("type", "string") }
-                    "mcstage_analyze_log" -> {
+                    "mcstage_analyze_log", "mcstage_export_log_badge", "mcstage_export_log_html" -> {
                         putJsonObject("log") { put("type", "string") }
                         putJsonObject("max_stall_ms") { put("type", "integer") }
                         putJsonObject("sarif") { put("type", "boolean") }
