@@ -27,11 +27,16 @@ class BudgetCommand : CliktCommand(name = "budget") {
     private val file by argument("file", help = "Path to mcstage.yml").path().default(Path.of("mcstage.yml"))
     private val hostRamGb by option("--host-ram-gb", help = "CI runner host RAM in GB (default: 7.0)").double().default(7.0)
     private val maxShards by option("--max-shards", help = "Maximum parallel CI shards (default: 4)").int().default(4)
+    private val html by option("--html", help = "Write self-contained dark-mode HTML CI budget report").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
         val scenario = ScenarioFile.read(file)
         val est = MatrixEstimator.estimate(scenario, hostRamGb = hostRamGb, maxShards = maxShards)
+        html?.let { target ->
+            target.parent?.let { java.nio.file.Files.createDirectories(it) }
+            java.nio.file.Files.writeString(target, MatrixEstimator.renderHtml(est))
+        }
         if (json) {
             echo(PRETTY_JSON.encodeToString(MatrixEstimator.toJson(est)))
         } else {

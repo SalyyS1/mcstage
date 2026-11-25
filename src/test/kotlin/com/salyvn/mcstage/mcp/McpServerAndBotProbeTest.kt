@@ -60,6 +60,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_inspect_plugin_jar",
                 "mcstage_render_comparison_html",
                 "mcstage_estimate_matrix_budget",
+                "mcstage_export_budget_html",
                 "mcstage_generate_github_action",
                 "mcstage_render_step_summary",
                 "mcstage_export_world_sarif",
@@ -498,7 +499,9 @@ class McpServerAndBotProbeTest {
             val parsed = ScenarioFile.read(out)
             assertTrue(parsed.steps.isNotEmpty(), "preset $preset should contain steps")
             if (preset == "ci-matrix") {
-                com.salyvn.mcstage.cli.BudgetCommand().parse(listOf(out.toString(), "--host-ram-gb", "7.0", "--max-shards", "3", "--json"))
+                val budgetHtml = dir.resolve("budget.html")
+                com.salyvn.mcstage.cli.BudgetCommand().parse(listOf(out.toString(), "--host-ram-gb", "7.0", "--max-shards", "3", "--html", budgetHtml.toString(), "--json"))
+                assertTrue(Files.readString(budgetHtml, StandardCharsets.UTF_8).contains("CI Matrix RAM &amp; Shard Budget"))
             }
         }
 
