@@ -42,6 +42,11 @@ class CompareCommand : CliktCommand(name = "compare") {
         help = "Optional path to also write an OASIS SARIF v2.1.0 report",
     ).path()
 
+    private val badgeJsonOut by option(
+        "--badge-json",
+        help = "Optional path to also write a shields.io Endpoint Badge JSON summary",
+    ).path()
+
     private val failOnRegression by option(
         "--fail-on-regression",
         help = "Exit with code 1 if any outcome, duration, or new-diagnostic regression is detected",
@@ -64,6 +69,11 @@ class CompareCommand : CliktCommand(name = "compare") {
         htmlOut?.let { path ->
             path.parent?.let { Files.createDirectories(it) }
             Files.writeString(path, ReportComparator.renderHtml(result), StandardCharsets.UTF_8)
+        }
+
+        badgeJsonOut?.let { path ->
+            path.parent?.let { Files.createDirectories(it) }
+            Files.writeString(path, ReportComparator.renderBadgeJson(result), StandardCharsets.UTF_8)
         }
 
         val rendered = when (format) {

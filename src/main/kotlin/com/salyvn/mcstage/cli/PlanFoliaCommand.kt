@@ -27,6 +27,7 @@ class PlanFoliaCommand : CliktCommand(name = "plan-folia") {
     private val modeRaw by option("--mode", help = "Topology mode: merge-split or disjoint (default: merge-split)").default("merge-split")
     private val spacing by option("--spacing", help = "Block spacing between region anchors (>=768, default: 1024)").int().default(FoliaRegionTopology.DEFAULT_SPACING_BLOCKS)
     private val htmlOut by option("--html", help = "Write a self-contained dark-mode HTML SVG region topology diagram").path()
+    private val badgeJsonOut by option("--badge-json", help = "Write a shields.io Endpoint Badge JSON summary").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -41,6 +42,10 @@ class PlanFoliaCommand : CliktCommand(name = "plan-folia") {
         htmlOut?.let { target ->
             target.parent?.let { Files.createDirectories(it) }
             Files.writeString(target, FoliaRegionTopology.renderTopologyHtml(anchors, mode, clampedSpacing))
+        }
+        badgeJsonOut?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            Files.writeString(target, FoliaRegionTopology.renderBadgeJson(anchors, mode, clampedSpacing))
         }
         if (json) {
             val payload = buildJsonObject {

@@ -537,6 +537,22 @@ $failureSection
     private fun escapeMdCell(input: String): String =
         input.replace("|", "\\|").replace("\n", " ").replace("\r", "")
 
+    /** Render a shields.io Endpoint Badge JSON summarizing aggregated JUnit XML test cases. */
+    fun renderBadgeJson(report: AggregatedReport): String {
+        val ok = report.ok
+        val color = when {
+            report.tests == 0 -> "lightgrey"
+            ok -> "brightgreen"
+            else -> "red"
+        }
+        val msg = if (ok) {
+            "PASS (${report.passed}/${report.tests})"
+        } else {
+            "FAIL (${report.failures + report.errors}/${report.tests})"
+        }
+        return """{"schemaVersion":1,"label":"mcstage junit","message":"$msg","color":"$color"}"""
+    }
+
     private companion object {
         val JSON = Json { prettyPrint = true }
     }

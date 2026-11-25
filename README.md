@@ -11,7 +11,7 @@ XML, Markdown CI summaries, or OASIS SARIF v2.1.0 reports. It downloads official
 digests (`SHA-256` / `MD5`) on both cache write and cache read, and reuses cached jars and worlds across runs:
 
 - **Interactive Browser Tool:** [MCStage Scenario Matrix Builder, Folia Recovery, RCON Fault & JUnit Aggregator Lab](https://salyys1.github.io/mcstage/) (100% client-side YAML builder, Folia `ThreadedRegionizer` lattice & crash-loop recovery planner, deterministic SplitMix64 RCON latency/drop simulator, `MCS001`-`MCS023` crash/barrier/bot-probe/bridge/regression/world-integrity/config-preflight/plugin-jar analyzer, and multi-file JUnit XML aggregator).
-- **Built-In 15-Tool Stdio MCP Server (`mcstage mcp`) & Full DevOps CLI (`v0.26.0`):** Connect Claude Code, Cursor, Windsurf, Codex, or Antigravity directly to `java -jar mcstage-0.26.0.jar mcp`, or run standalone CLI commands: `mcstage github-action` (cached GitHub Actions + SARIF workflow generator), `mcstage list-rules` (`MCS001`-`MCS023` rule catalog), `mcstage budget` (CI RAM/shard planner), `mcstage probe` (pure-JVM SLP ping), `mcstage init --preset <basic|folia-stress|rpg-bot-bridge|ci-matrix>`, `mcstage inspect-jar` (`MCS023`), `mcstage preflight` (`MCS022`), `mcstage check-world` (`MCS021`), `mcstage compare` (`MCS020`), and `mcstage doctor`.
+- **Built-In 34-Tool Stdio MCP Server (`mcstage mcp`) & Full DevOps CLI (`v0.52.0`):** Connect Claude Code, Cursor, Windsurf, Codex, or Antigravity directly to `java -jar mcstage-0.52.0.jar mcp`, or run standalone CLI commands with dark-mode HTML, SARIF v2.1.0, and Shields.io Endpoint Badge JSON outputs: `mcstage github-action`, `mcstage list-rules` (`MCS001`-`MCS023`), `mcstage budget --html`, `mcstage probe`, `mcstage init --preset <basic|folia-stress|rpg-bot-bridge|ci-matrix>`, `mcstage plan-folia --html --badge-json`, `mcstage inspect-jar --html --sarif --badge-json` (`MCS023`), `mcstage preflight --html --sarif --badge-json` (`MCS022`), `mcstage check-world --html --sarif --badge-json` (`MCS021`), `mcstage compare --html --sarif --badge-json` (`MCS020`), `mcstage aggregate --html --badge-json`, and `mcstage doctor --html --badge-json`.
 - **Self-Contained Dark-Mode HTML Matrix Reports (`--format html` / `--html report.html`) & `mcstage doctor`:** Generate zero-CDN offline HTML matrix reports for CI artifacts and verify Java 21+, cache health, loopback ports, and companion bridge readiness with a single command.
 - **Baseline Regression Comparator (`mcstage compare` / `MCS020`) & First-Class YAML `assert-world-integrity` (`MCS021`):** Diff two `mcstage` JSON reports in CI to catch regressions (`--max-slowdown-pct`) and validate Anvil `.mca` 4096-byte sectors + GZIP `level.dat` directly inside `mcstage.yml`.
 - **Headless SLP Bot Probe (`bot-probe` / `MCS018`) & Companion Bridge Telemetry + Player GUI Checks (`assert-bridge` / `MCS019`):** Verify live loopback Minecraft Java Edition TCP handshakes, latency, version/MOTD, and companion `mckit-bridge-plugin` TPS/MSPT/SEVERE errors AND open player GUI titles (`player` + `expect-gui-title` via `/api/v1/gui`) without opening a desktop Minecraft client!
@@ -51,20 +51,21 @@ to support:
 ## Getting Started
 
 Requires Java 21+ to run `mcstage` (`--java` or `MCSTAGE_JAVA` can point target servers at another JDK if needed).
-Download `mcstage-0.25.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
+Download `mcstage-0.52.0.jar` from [Releases](https://github.com/SalyyS1/mcstage/releases):
 
 ```sh
-java -jar mcstage-0.25.0.jar init --preset rpg-bot-bridge  # starter presets: basic, folia-stress, rpg-bot-bridge, ci-matrix
-java -jar mcstage-0.25.0.jar budget mcstage.yml --host-ram-gb 7 --max-shards 4  # estimate CI peak RAM, cache & shards
-java -jar mcstage-0.25.0.jar probe 127.0.0.1 --port 25565 --json  # pure-JVM Minecraft Java SLP status & latency probe (MCS018)
-java -jar mcstage-0.24.0.jar inspect-jar build/libs/app.jar --folia --json  # pre-boot plugin.yml/paper-plugin.yml & JVM bytecode audit (MCS023)
-java -jar mcstage-0.23.0.jar preflight ./server --jvm-arg -Xms2G --jvm-arg -Xmx2G --jvm-arg -XX:+UseG1GC  # server.properties & JVM audit (MCS022)
-java -jar mcstage-0.23.0.jar check-world ./server/world --require-unlocked --json  # offline Anvil .mca & level.dat integrity check (MCS021)
-java -jar mcstage-0.23.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, bridge GUI, regex, matrix, and Java check
-java -jar mcstage-0.23.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --html build/reports/matrix.html --sarif mcstage.sarif
-java -jar mcstage-0.23.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --html diff.html --sarif diff.sarif
-java -jar mcstage-0.23.0.jar aggregate build/reports -o build/reports/merged.xml --summary-markdown summary.md --fail-on-failure
-java -jar mcstage-0.23.0.jar mcp                           # run as a 15-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
+java -jar mcstage-0.52.0.jar init --preset rpg-bot-bridge  # starter presets: basic, folia-stress, rpg-bot-bridge, ci-matrix
+java -jar mcstage-0.52.0.jar budget mcstage.yml --host-ram-gb 7 --max-shards 4 --html budget.html  # CI peak RAM, cache & shards
+java -jar mcstage-0.52.0.jar probe 127.0.0.1 --port 25565 --json  # pure-JVM Minecraft Java SLP status & latency probe (MCS018)
+java -jar mcstage-0.52.0.jar inspect-jar build/libs/app.jar --folia --html jar.html --badge-json jar-badge.json  # pre-boot JAR audit (MCS023)
+java -jar mcstage-0.52.0.jar preflight ./server --jvm-arg -Xms2G --jvm-arg -Xmx2G --jvm-arg -XX:+UseG1GC --badge-json preflight-badge.json  # (MCS022)
+java -jar mcstage-0.52.0.jar check-world ./server/world --require-unlocked --html world.html --badge-json world-badge.json  # Anvil integrity (MCS021)
+java -jar mcstage-0.52.0.jar plan-folia --regions 4 --mode merge-split --html folia.html --badge-json folia-badge.json  # Folia SVG + badge
+java -jar mcstage-0.52.0.jar validate mcstage.yml          # offline schema, Folia spacing, RCON fault, bot-probe, bridge GUI, regex, matrix, and Java check
+java -jar mcstage-0.52.0.jar test mcstage.yml --accept-eula --format json -o build/reports/current.json --html build/reports/matrix.html --sarif mcstage.sarif
+java -jar mcstage-0.52.0.jar compare baseline.json current.json --max-slowdown-pct 25 --fail-on-regression --html diff.html --sarif diff.sarif --badge-json cmp-badge.json
+java -jar mcstage-0.52.0.jar aggregate build/reports -o build/reports/merged.xml --html junit.html --badge-json junit-badge.json --summary-markdown summary.md --fail-on-failure
+java -jar mcstage-0.52.0.jar mcp                           # run as a 34-tool JSON-RPC 2.0 stdio MCP server for AI coding agents
 ```
 
 ## Writing a Scenario (`mcstage.yml`)

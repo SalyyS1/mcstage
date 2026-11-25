@@ -240,6 +240,17 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1
 <tbody>$rows</tbody></table></div></div></body></html>"""
     }
 
+    /** Render a shields.io Endpoint Badge JSON summarizing baseline vs current regression comparison (MCS020). */
+    fun renderBadgeJson(result: ComparisonResult): String {
+        val color = if (result.ok) "brightgreen" else "red"
+        val msg = if (result.ok) {
+            "NO REGRESSIONS (${result.cases.size} target(s))"
+        } else {
+            "${result.totalRegressions} REGRESSION(S)"
+        }
+        return """{"schemaVersion":1,"label":"mcstage compare","message":"$msg","color":"$color"}"""
+    }
+
     fun renderSarif(result: ComparisonResult): String {
         val caseResults = result.cases.map { c ->
             val platform = Platform.entries.firstOrNull { it.id.equals(c.platform, ignoreCase = true) } ?: Platform.PAPER

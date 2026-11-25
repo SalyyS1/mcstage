@@ -57,9 +57,11 @@ class McpServerAndBotProbeTest {
                 "mcstage_probe_server",
                 "mcstage_aggregate_junit",
                 "mcstage_export_junit_html",
+                "mcstage_export_junit_badge",
                 "mcstage_audit_server_config",
                 "mcstage_inspect_plugin_jar",
                 "mcstage_render_comparison_html",
+                "mcstage_export_compare_badge",
                 "mcstage_estimate_matrix_budget",
                 "mcstage_export_budget_html",
                 "mcstage_generate_github_action",
@@ -76,6 +78,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_export_doctor_badge",
                 "mcstage_export_doctor_html",
                 "mcstage_export_folia_topology_html",
+                "mcstage_export_folia_badge",
                 "mcstage_export_summary_badge",
                 "mcstage_list_rules",
             ),
@@ -612,5 +615,69 @@ class McpServerAndBotProbeTest {
         assertEquals(2, junitPayload["tests"]!!.jsonPrimitive.int)
         assertEquals(1, junitPayload["failures"]!!.jsonPrimitive.int)
         assertTrue(junitPayload["html"]!!.jsonPrimitive.content.contains("matrix-smoke"))
+
+        // Verify v0.52.0 Badge JSON CLI flags & 3 new MCP tools (Folia, JUnit, Compare -> 34 MCP tools)
+        val foliaBadgeOut = dir.resolve("folia-badge.json")
+        com.salyvn.mcstage.cli.PlanFoliaCommand().parse(listOf("--regions", "4", "--mode", "disjoint", "--badge-json", foliaBadgeOut.toString()))
+        assertTrue(Files.readString(foliaBadgeOut, StandardCharsets.UTF_8).contains("mcstage folia"))
+        assertTrue(Files.readString(foliaBadgeOut, StandardCharsets.UTF_8).contains("DISJOINT"))
+
+        val junitBadgeOut = dir.resolve("junit-badge.json")
+        com.salyvn.mcstage.cli.AggregateCommand().parse(listOf(junitFile.toString(), "--badge-json", junitBadgeOut.toString()))
+        assertTrue(Files.readString(junitBadgeOut, StandardCharsets.UTF_8).contains("mcstage junit"))
+        assertTrue(Files.readString(junitBadgeOut, StandardCharsets.UTF_8).contains("FAIL (1/2)"))
+
+        val baseRep = dir.resolve("base-rep.json")
+        val currRep = dir.resolve("curr-rep.json")
+        val cmpBadgeOut = dir.resolve("cmp-badge.json")
+        val sampleJson = """{"scenario":"smoke","cases":[{"platform":"paper","version":"1.21.4","outcome":"PASSED","elapsedMillis":1200,"diagnostics":[]}]}"""
+        Files.writeString(baseRep, sampleJson, StandardCharsets.UTF_8)
+        Files.writeString(currRep, sampleJson, StandardCharsets.UTF_8)
+        com.salyvn.mcstage.cli.CompareCommand().parse(listOf(baseRep.toString(), currRep.toString(), "--badge-json", cmpBadgeOut.toString()))
+        assertTrue(Files.readString(cmpBadgeOut, StandardCharsets.UTF_8).contains("NO REGRESSIONS"))
+
+        val foliaBadgeResp = json.parseToJsonElement(
+            mcp.handleMessage("""{"jsonrpc":"2.0","id":320,"method":"tools/call","params":{"name":"mcstage_export_folia_badge","arguments":{"regions":4,"mode":"merge-split"}}}""")!!,
+        ).jsonObject
+        val foliaBadgePayload = json.parseToJsonElement(
+            foliaBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals("brightgreen", foliaBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        val junitBadgeReq = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(321))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_junit_badge"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("inputs", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive(junitFile.toString())) })
+                })
+            })
+        }
+        val junitBadgeResp = json.parseToJsonElement(mcp.handleMessage(junitBadgeReq.toString())!!).jsonObject
+        val junitBadgePayload = json.parseToJsonElement(
+            junitBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals("red", junitBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        val cmpBadgeReq = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(322))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_compare_badge"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("baseline_json", kotlinx.serialization.json.JsonPrimitive(sampleJson))
+                    put("current_json", kotlinx.serialization.json.JsonPrimitive(sampleJson))
+                })
+            })
+        }
+        val cmpBadgeResp = json.parseToJsonElement(mcp.handleMessage(cmpBadgeReq.toString())!!).jsonObject
+        val cmpBadgePayload = json.parseToJsonElement(
+            cmpBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(cmpBadgePayload["ok"]!!.jsonPrimitive.boolean)
+        assertEquals("brightgreen", cmpBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
     }
 }

@@ -175,6 +175,20 @@ object FoliaRegionTopology {
         }
     }
 
+    /** Render a shields.io Endpoint Badge JSON summarizing Folia ThreadedRegionizer topology disjointness. */
+    fun renderBadgeJson(
+        nodes: List<RegionNode>,
+        mode: Mode,
+        spacingBlocks: Int,
+    ): String {
+        val minSectionStep = spacingBlocks / SECTION_BLOCK_SIZE
+        val disjointOk = minSectionStep >= MIN_DISJOINT_SECTION_DISTANCE
+        val color = if (disjointOk) "brightgreen" else "red"
+        val status = if (disjointOk) "DISJOINT" else "OVERLAP"
+        val msg = "${nodes.size} regions · ${mode.id} · $status"
+        return """{"schemaVersion":1,"label":"mcstage folia","message":"$msg","color":"$color"}"""
+    }
+
     /** Render a self-contained dark-mode HTML report with an SVG Folia ThreadedRegionizer 16-chunk section grid. */
     fun renderTopologyHtml(
         nodes: List<RegionNode>,

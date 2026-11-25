@@ -123,9 +123,11 @@ class McstageMcpServer {
                 "mcstage_probe_server" -> toolProbeServer(args)
                 "mcstage_aggregate_junit" -> toolAggregateJunit(args)
                 "mcstage_export_junit_html" -> toolExportJunitHtml(args)
+                "mcstage_export_junit_badge" -> toolExportJunitBadge(args)
                 "mcstage_audit_server_config" -> toolAuditServerConfig(args)
                 "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
                 "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
+                "mcstage_export_compare_badge" -> toolExportCompareBadge(args)
                 "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
                 "mcstage_export_budget_html" -> toolExportBudgetHtml(args)
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
@@ -142,6 +144,7 @@ class McstageMcpServer {
                 "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
                 "mcstage_export_doctor_html" -> toolExportDoctorHtml(args)
                 "mcstage_export_folia_topology_html" -> toolExportFoliaTopologyHtml(args)
+                "mcstage_export_folia_badge" -> toolExportFoliaBadge(args)
                 "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
@@ -942,6 +945,61 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportFoliaBadge(args: JsonObject): JsonObject {
+        val regions = (args["regions"]?.jsonPrimitive?.intOrNull ?: 4).coerceIn(1, 32)
+        val modeRaw = args["mode"]?.jsonPrimitive?.contentOrNull ?: "merge-split"
+        val spacing = (args["spacing"]?.jsonPrimitive?.intOrNull ?: FoliaRegionTopology.DEFAULT_SPACING_BLOCKS).coerceAtLeast(768)
+        val mode = if (modeRaw.equals("disjoint", ignoreCase = true)) {
+            FoliaRegionTopology.Mode.DISJOINT
+        } else {
+            FoliaRegionTopology.Mode.MERGE_SPLIT
+        }
+        val anchors = FoliaRegionTopology.planNodes(regions = regions, spacingBlocks = spacing)
+        val badgeObj = json.parseToJsonElement(FoliaRegionTopology.renderBadgeJson(anchors, mode, spacing)).jsonObject
+        return buildJsonObject {
+            put("regions", regions)
+            put("mode", mode.id)
+            put("spacing_blocks", spacing)
+            put("badge", badgeObj)
+        }
+    }
+
+    private fun toolExportJunitBadge(args: JsonObject): JsonObject {
+        val rawInputs = args["inputs"]?.let { el ->
+            (el as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        } ?: throw IllegalArgumentException("Missing required 'inputs' array of JUnit XML paths/dirs/globs.")
+        val suiteName = args["name"]?.jsonPrimitive?.contentOrNull?.ifBlank { "mcstage-aggregated" } ?: "mcstage-aggregated"
+        val agg = com.salyvn.mcstage.report.JunitXmlAggregator()
+        val files = agg.discoverXmlFiles(rawInputs)
+        val report = agg.aggregateFiles(files, name = suiteName)
+        val badgeObj = json.parseToJsonElement(agg.renderBadgeJson(report)).jsonObject
+        return buildJsonObject {
+            put("name", report.name)
+            put("ok", report.ok)
+            put("tests", report.tests)
+            put("passed", report.passed)
+            put("failures", report.failures)
+            put("errors", report.errors)
+            put("badge", badgeObj)
+        }
+    }
+
+    private fun toolExportCompareBadge(args: JsonObject): JsonObject {
+        val baseline = args["baseline_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'baseline_json' string.")
+        val current = args["current_json"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'current_json' string.")
+        val maxSlowdown = args["max_slowdown_pct"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 25.0
+        val comparison = ReportComparator.compare(baseline, current, maxSlowdownPercent = maxSlowdown)
+        val badgeObj = json.parseToJsonElement(ReportComparator.renderBadgeJson(comparison)).jsonObject
+        return buildJsonObject {
+            put("ok", comparison.ok)
+            put("total_regressions", comparison.totalRegressions)
+            put("target_count", comparison.cases.size)
+            put("badge", badgeObj)
+        }
+    }
+
     private fun toolExportSummaryBadge(args: JsonObject): JsonObject {
         val raw = args["report_json"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Missing required 'report_json' string.")
@@ -994,9 +1052,11 @@ class McstageMcpServer {
         add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
         add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
         add(toolDef("mcstage_export_junit_html", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) and render a self-contained dark-mode HTML JUnit Report with XXE hardening.", listOf("inputs")))
+        add(toolDef("mcstage_export_junit_badge", "Aggregate sharded JUnit XML matrix reports and emit a shields.io Endpoint Badge JSON pass/fail payload.", listOf("inputs")))
         add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
         add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
+        add(toolDef("mcstage_export_compare_badge", "Compare baseline vs current mcstage JSON reports and emit a shields.io Endpoint Badge JSON regression payload (MCS020).", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
         add(toolDef("mcstage_export_budget_html", "Estimate CI peak RAM, JAR cache, and shard split for an mcstage.yml scenario and render a dark-mode HTML Budget Report.", listOf("yaml")))
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
@@ -1013,6 +1073,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
         add(toolDef("mcstage_export_doctor_html", "Run mcstage environment doctor and render a self-contained dark-mode HTML readiness report.", emptyList()))
         add(toolDef("mcstage_export_folia_topology_html", "Plan Folia ThreadedRegionizer 16-chunk section anchors and render a dark-mode SVG topology HTML diagram.", emptyList()))
+        add(toolDef("mcstage_export_folia_badge", "Plan Folia ThreadedRegionizer 16-chunk section anchors and emit a shields.io Endpoint Badge JSON disjointness payload.", emptyList()))
         add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
@@ -1030,7 +1091,7 @@ class McstageMcpServer {
                         putJsonObject("max_stall_ms") { put("type", "integer") }
                         putJsonObject("sarif") { put("type", "boolean") }
                     }
-                    "mcstage_plan_folia_topology", "mcstage_export_folia_topology_html" -> {
+                    "mcstage_plan_folia_topology", "mcstage_export_folia_topology_html", "mcstage_export_folia_badge" -> {
                         putJsonObject("regions") { put("type", "integer") }
                         putJsonObject("mode") { put("type", "string") }
                         putJsonObject("spacing") { put("type", "integer") }
@@ -1059,7 +1120,7 @@ class McstageMcpServer {
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("timeout_ms") { put("type", "integer") }
                     }
-                    "mcstage_aggregate_junit", "mcstage_export_junit_html" -> {
+                    "mcstage_aggregate_junit", "mcstage_export_junit_html", "mcstage_export_junit_badge" -> {
                         putJsonObject("inputs") { put("type", "array") }
                         putJsonObject("name") { put("type", "string") }
                     }
@@ -1072,7 +1133,7 @@ class McstageMcpServer {
                         putJsonObject("jar_path") { put("type", "string") }
                         putJsonObject("target_folia") { put("type", "boolean") }
                     }
-                    "mcstage_render_comparison_html" -> {
+                    "mcstage_render_comparison_html", "mcstage_export_compare_badge" -> {
                         putJsonObject("baseline_json") { put("type", "string") }
                         putJsonObject("current_json") { put("type", "string") }
                         putJsonObject("max_slowdown_pct") { put("type", "number") }

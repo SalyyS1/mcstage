@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.51.0 | 31-Tool MCP Server, Real-Server Plugin Matrix Builder, Full HTML/SVG/Badge Suite</title>
-  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.51.0: 31-tool stdio MCP server, GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator with 1-click presets (mcstage budget --html), JUnit XML dark-mode HTML aggregator (mcstage aggregate --html), headless SLP probe (mcstage probe), pre-boot plugin JAR inspector (MCS023 + HTML/SARIF/Badge), preflight auditor (MCS022 + HTML/SARIF/Badge), world integrity checker (MCS021 + HTML/SARIF/Badge), Folia SVG topology (--html), and SARIF v2.1.0." />
+  <title>mcstage v0.52.0 | 34-Tool MCP Server, Real-Server Plugin Matrix Builder, Full HTML/SVG/Badge Suite</title>
+  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.52.0: 34-tool stdio MCP server, GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator with 1-click presets (mcstage budget --html), JUnit XML dark-mode HTML &amp; Badge aggregator (mcstage aggregate --html --badge-json), headless SLP probe (mcstage probe), pre-boot plugin JAR inspector (MCS023 + HTML/SARIF/Badge), preflight auditor (MCS022 + HTML/SARIF/Badge), world integrity checker (MCS021 + HTML/SARIF/Badge), compare regression diff (MCS020 + HTML/SARIF/Badge), Folia SVG topology (--html --badge-json), and SARIF v2.1.0." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -287,7 +287,7 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.51.0 | 31-Tool Stdio MCP · JUnit, Budget, World (+Badge), Preflight (+Badge), Folia SVG, Doctor &amp; JAR (+Badge) · MCS001-MCS023</span>
+        <span class="badge">mcstage v0.52.0 | 34-Tool Stdio MCP · JUnit (+Badge), Budget, World (+Badge), Preflight (+Badge), Compare (+Badge), Folia SVG (+Badge), Doctor &amp; JAR (+Badge) · MCS001-MCS023</span>
         <div class="navlinks">
           <a href="https://salyys1.github.io/minecraftkit/showcase.html">MinecraftKit Suite</a>
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
@@ -296,7 +296,7 @@
       </div>
       <h1>MCStage Real-Server Plugin Matrix Builder, MCP Server, Preflight &amp; Regression Lab</h1>
       <p class="subtitle">
-        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020), Anvil world integrity (MCS021 + HTML/SARIF/Badge), server.properties/JVM preflight (MCS022 + HTML/SARIF/Badge), plugin JAR bytecode inspector (MCS023 + HTML/SARIF/Badge), JUnit XML HTML aggregation, CI RAM/shard budgeting, and a built-in 31-tool stdio MCP server.
+        Design multi-platform Paper, Folia, and Purpur integration scenarios with headless SLP bot-probe (MCS018), companion mckit-bridge-plugin TPS/MSPT/GUI checks (MCS019), baseline report regression comparator (MCS020 + HTML/SARIF/Badge), Anvil world integrity (MCS021 + HTML/SARIF/Badge), server.properties/JVM preflight (MCS022 + HTML/SARIF/Badge), plugin JAR bytecode inspector (MCS023 + HTML/SARIF/Badge), JUnit XML HTML &amp; Badge aggregation, Folia SVG + Badge topology, CI RAM/shard budgeting, and a built-in 34-tool stdio MCP server.
       </p>
     </div>
   </header>
@@ -306,7 +306,7 @@
     <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS023)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
     <button class="tab-btn" id="tabRconBtn" onclick="switchTab('rcon')">4. RCON Wire &amp; Fault Injection Lab</button>
-    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 31-Tool MCP Server &amp; Report Comparator (MCS020)</button>
+    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 34-Tool MCP Server &amp; Report Comparator (MCS020)</button>
     <button class="tab-btn" id="tabPreflightBtn" onclick="switchTab('preflight')">6. Config Preflight (MCS022) &amp; CI RAM Calculator</button>
   </div>
 
@@ -581,17 +581,18 @@
       </div>
       <div class="card">
         <h2>
-          <span>MCS020 Verdict &amp; 24-Tool Stdio MCP Config</span>
+          <span>MCS020 Verdict &amp; 34-Tool Stdio MCP Config</span>
           <button class="btn" onclick="copyText('mcpCfgOut')">Copy MCP Config</button>
         </h2>
-        <div id="cmpVerdict" class="status-box status-ok" style="margin-bottom:12px;">Click Compare Reports to diff baseline vs current.</div>
+        <div id="cmpVerdict" class="status-box status-ok" style="margin-bottom:10px;">Click Compare Reports to diff baseline vs current.</div>
+        <div id="cmpBadgePreview" style="margin-bottom:10px;"></div>
         <pre id="cmpMdOut" style="margin-bottom:14px; max-height:180px;"></pre>
-        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code> — 15 Tools)</label>
+        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code> — 34 Tools)</label>
         <pre id="mcpCfgOut">{
   "mcpServers": {
     "mcstage": {
       "command": "java",
-      "args": ["-jar", "mcstage-0.24.0.jar", "mcp"]
+      "args": ["-jar", "mcstage-0.52.0.jar", "mcp"]
     }
   }
 }</pre>
@@ -676,7 +677,7 @@ folia-supported: false</textarea>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.51.0 (31 MCP Tools) · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.52.0 (34 MCP Tools) · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
   </footer>
 
   <script>
@@ -884,13 +885,14 @@ folia-supported: false</textarea>
         `Recommended Shards : ${shards} (max ${Math.ceil(cases / shards)} case(s)/shard)`,
         `Estimated Serial   : ${serialSec}s`,
         `Estimated Sharded  : ${parallelSec}s`,
-        `CLI Preflight Cmd  : java -jar mcstage-0.50.0.jar preflight ./server --jvm-arg -Xms${heap}G --jvm-arg -Xmx${heap}G --jvm-arg -XX:+UseG1GC`,
-        `CLI JAR Audit Cmd  : java -jar mcstage-0.50.0.jar inspect-jar build/libs/plugin.jar --folia --badge-json jar-badge.json`
+        `CLI Preflight Cmd  : java -jar mcstage-0.52.0.jar preflight ./server --jvm-arg -Xms${heap}G --jvm-arg -Xmx${heap}G --jvm-arg -XX:+UseG1GC --badge-json preflight-badge.json`,
+        `CLI JAR Audit Cmd  : java -jar mcstage-0.52.0.jar inspect-jar build/libs/plugin.jar --folia --badge-json jar-badge.json`
       ].join("\n");
     }
 
     function runBrowserCompare() {
       const verdictEl = document.getElementById("cmpVerdict");
+      const badgeEl = document.getElementById("cmpBadgePreview");
       const outEl = document.getElementById("cmpMdOut");
       try {
         const base = JSON.parse(document.getElementById("cmpBase").value);
@@ -915,6 +917,13 @@ folia-supported: false</textarea>
         verdictEl.textContent = regressions
           ? `MCS020 REGRESSION DETECTED: ${regressions} case(s) regressed (max slowdown ${maxSlow}%).`
           : `PASS: 0 regressions across ${(curr.cases || []).length} case(s).`;
+        if (badgeEl) {
+          const msg = regressions ? `${regressions} REGRESSION(S)` : `NO REGRESSIONS (${(curr.cases || []).length} target(s))`;
+          const col = regressions ? "#e05d44" : "#4c1";
+          const w2 = Math.max(120, msg.length * 7 + 16);
+          const tot = 114 + w2;
+          badgeEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${tot}" height="20" role="img" aria-label="mcstage compare: ${escapeHtmlAttr(msg)}"><rect width="114" height="20" rx="3" fill="#555"/><rect x="114" width="${w2}" height="20" rx="3" fill="${col}"/><g fill="#fff" text-anchor="middle" font-family="Verdana,sans-serif" font-size="11"><text x="57" y="14">mcstage compare</text><text x="${114 + Math.round(w2 / 2)}" y="14">${escapeHtml(msg)}</text></g></svg>`;
+        }
         outEl.textContent = lines.join("\n");
       } catch (err) {
         verdictEl.className = "status-box status-err";
@@ -1850,6 +1859,7 @@ folia-supported: false</textarea>
     loadSampleJunit();
     simulateRconFault();
     runManifestLint();
+    runBrowserCompare();
   </script>
 </body>
 </html>

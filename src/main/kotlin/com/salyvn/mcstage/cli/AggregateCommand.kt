@@ -49,6 +49,11 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
         help = "Write a self-contained dark-mode HTML JUnit matrix report to this path",
     ).path()
 
+    private val badgeJsonOutput by option(
+        "--badge-json",
+        help = "Write a shields.io Endpoint Badge JSON summary to this path",
+    ).path()
+
     private val summaryMarkdown by option(
         "--summary-markdown",
         help = "Write a GitHub Flavored Markdown summary table to this path (for example \$GITHUB_STEP_SUMMARY)",
@@ -67,7 +72,7 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
     override fun run() {
         try {
             val aggregator = JunitXmlAggregator()
-            val excluded = setOfNotNull(output, summaryMarkdown, htmlOutput)
+            val excluded = setOfNotNull(output, summaryMarkdown, htmlOutput, badgeJsonOutput)
             val files = aggregator.discoverXmlFiles(inputs, excludePaths = excluded)
             if (files.isEmpty() && !allowEmpty) {
                 throw SetupError("No JUnit XML files matched inputs: ${inputs.joinToString(", ")}.")
@@ -85,6 +90,11 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
                 htmlPath.parent?.let { Files.createDirectories(it) }
                 val html = if (format == "html") primaryText else aggregator.renderHtml(report)
                 Files.writeString(htmlPath, html)
+            }
+
+            badgeJsonOutput?.let { badgePath ->
+                badgePath.parent?.let { Files.createDirectories(it) }
+                Files.writeString(badgePath, aggregator.renderBadgeJson(report))
             }
 
             summaryMarkdown?.let { mdPath ->
