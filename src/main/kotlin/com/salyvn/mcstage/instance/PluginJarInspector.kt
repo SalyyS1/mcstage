@@ -208,6 +208,20 @@ object PluginJarInspector {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
 
+    /** Render a shields.io Endpoint Badge JSON summarizing pre-boot Plugin JAR readiness. */
+    fun renderBadgeJson(rep: InspectionReport): String {
+        val color = if (rep.ok) "brightgreen" else "red"
+        val label = rep.pluginName ?: "plugin jar"
+        val foliaTag = if (rep.foliaSupported) "Folia" else "Paper"
+        val msg = if (rep.ok) {
+            "PASS ($label, Java ${rep.mainClassJavaMajor ?: "?"}, $foliaTag)"
+        } else {
+            "FAIL (${rep.issues.size} issue(s))"
+        }
+        val escMsg = msg.replace("\\", "\\\\").replace("\"", "\\\"")
+        return """{"schemaVersion":1,"label":"mcstage jar","message":"$escMsg","color":"$color"}"""
+    }
+
     /** Render a self-contained dark-mode HTML Plugin JAR Inspection Report (`inspect-jar --html`). */
     fun renderHtml(rep: InspectionReport): String {
         val statusCol = if (rep.ok) "#22c55e" else "#ef4444"

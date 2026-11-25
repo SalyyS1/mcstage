@@ -38,6 +38,7 @@ class InspectJarCommand : CliktCommand(name = "inspect-jar") {
         .default(Runtime.version().feature())
     private val sarifOut by option("--sarif", help = "Write OASIS SARIF v2.1.0 MCS023 report to path").path()
     private val htmlOut by option("--html", help = "Write a self-contained dark-mode HTML plugin JAR audit report").path()
+    private val badgeOut by option("--badge-json", help = "Write shields.io Endpoint Badge JSON summarizing pre-boot JAR readiness").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -45,6 +46,10 @@ class InspectJarCommand : CliktCommand(name = "inspect-jar") {
         htmlOut?.let { hp ->
             hp.parent?.let { Files.createDirectories(it) }
             Files.writeString(hp, PluginJarInspector.renderHtml(report), StandardCharsets.UTF_8)
+        }
+        badgeOut?.let { bp ->
+            bp.parent?.let { Files.createDirectories(it) }
+            Files.writeString(bp, PluginJarInspector.renderBadgeJson(report), StandardCharsets.UTF_8)
         }
         sarifOut?.let { sp ->
             val diags = report.issues.map { iss ->

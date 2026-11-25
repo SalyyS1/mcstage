@@ -137,6 +137,7 @@ class McstageMcpServer {
                 "mcstage_export_preflight_html" -> toolExportPreflightHtml(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_export_jar_html" -> toolExportJarHtml(args)
+                "mcstage_export_jar_badge" -> toolExportJarBadge(args)
                 "mcstage_export_doctor_badge" -> toolExportDoctorBadge(args)
                 "mcstage_export_doctor_html" -> toolExportDoctorHtml(args)
                 "mcstage_export_folia_topology_html" -> toolExportFoliaTopologyHtml(args)
@@ -797,6 +798,23 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportJarBadge(args: JsonObject): JsonObject {
+        val jarStr = args["jar_path"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'jar_path' string.")
+        val targetFolia = args["target_folia"]?.jsonPrimitive?.booleanOrNull ?: false
+        val rep = com.salyvn.mcstage.instance.PluginJarInspector.inspect(
+            java.nio.file.Path.of(jarStr),
+            targetFolia = targetFolia,
+        )
+        val badgeObj = json.parseToJsonElement(com.salyvn.mcstage.instance.PluginJarInspector.renderBadgeJson(rep)).jsonObject
+        return buildJsonObject {
+            put("ok", rep.ok)
+            put("plugin_name", rep.pluginName ?: "")
+            put("issue_count", rep.issues.size)
+            put("badge", badgeObj)
+        }
+    }
+
     private fun toolExportWorldHtml(args: JsonObject): JsonObject {
         val dirStr = args["world_dir"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Missing required 'world_dir' string.")
@@ -968,6 +986,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_preflight_html", "Audit server.properties and JVM flags and render a self-contained dark-mode HTML preflight report (MCS022).", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_export_jar_html", "Inspect a compiled Minecraft plugin JAR and render a self-contained dark-mode HTML report (MCS023).", listOf("jar_path")))
+        add(toolDef("mcstage_export_jar_badge", "Inspect a compiled Minecraft plugin JAR and emit a shields.io Endpoint Badge JSON readiness payload (MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_export_doctor_badge", "Run mcstage environment doctor and return a shields.io Endpoint Badge JSON readiness payload.", emptyList()))
         add(toolDef("mcstage_export_doctor_html", "Run mcstage environment doctor and render a self-contained dark-mode HTML readiness report.", emptyList()))
         add(toolDef("mcstage_export_folia_topology_html", "Plan Folia ThreadedRegionizer 16-chunk section anchors and render a dark-mode SVG topology HTML diagram.", emptyList()))
@@ -1057,7 +1076,7 @@ class McstageMcpServer {
                         putJsonObject("server_dir") { put("type", "string") }
                         putJsonObject("jvm_flags") { put("type", "array") }
                     }
-                    "mcstage_export_jar_sarif", "mcstage_export_jar_html" -> {
+                    "mcstage_export_jar_sarif", "mcstage_export_jar_html", "mcstage_export_jar_badge" -> {
                         putJsonObject("jar_path") { put("type", "string") }
                         putJsonObject("target_folia") { put("type", "boolean") }
                     }
