@@ -34,6 +34,7 @@ class PreflightCommand : CliktCommand(name = "preflight") {
     private val target by argument("target", help = "Server directory containing server.properties, or direct path to server.properties").path()
     private val jvmArgs by option("--jvm-arg", help = "JVM flag to audit (repeatable, e.g. --jvm-arg -Xms2G --jvm-arg -Xmx2G)").multiple()
     private val sarifOut by option("--sarif", help = "Write OASIS SARIF v2.1.0 MCS022 report to path").path()
+    private val htmlOut by option("--html", help = "Write a self-contained dark-mode HTML preflight audit report").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -43,6 +44,10 @@ class PreflightCommand : CliktCommand(name = "preflight") {
             ConfigPreflight.audit(Files.readString(target), jvmArgs)
         } else {
             ConfigPreflight.audit("", jvmArgs)
+        }
+        htmlOut?.let { hp ->
+            hp.parent?.let { Files.createDirectories(it) }
+            Files.writeString(hp, ConfigPreflight.renderHtml(report), StandardCharsets.UTF_8)
         }
         sarifOut?.let { sp ->
             val diags = report.issues.map { iss ->

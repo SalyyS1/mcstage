@@ -242,4 +242,35 @@ object ConfigPreflight {
             }
         }
     }
+
+    private fun htmlEsc(raw: String): String = raw
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+
+    /** Render a self-contained dark-mode HTML Server Config Preflight Report (`preflight --html`). */
+    fun renderHtml(report: Report): String {
+        val statusCol = if (report.ok) "#22c55e" else "#ef4444"
+        val rows = if (report.issues.isEmpty()) {
+            """<tr><td colspan="5" style="color:#22c55e"><b>PASS &mdash; Zero MCS022 configuration or JVM flag hazards found.</b></td></tr>"""
+        } else {
+            report.issues.joinToString("\n") { iss ->
+                val c = if (iss.severity.equals("error", ignoreCase = true)) "#ef4444" else "#f59e0b"
+                """<tr><td><code>${htmlEsc(iss.code)}</code></td><td style="color:$c"><b>${htmlEsc(iss.severity.uppercase())}</b></td><td><code>${htmlEsc(iss.key)}</code></td><td>${htmlEsc(iss.message)}</td><td>${htmlEsc(iss.recommendation)}</td></tr>"""
+            }
+        }
+        return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>mcstage Config Preflight Report (Grade ${htmlEsc(report.grade)})</title>
+<style>
+body{margin:0;padding:28px;background:#0b0f17;color:#e6edf7;font-family:system-ui,sans-serif}
+.wrap{max-width:1040px;margin:0 auto}.card{background:#121826;border:1px solid #26324d;border-radius:10px;padding:18px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:8px 10px;border-bottom:1px solid #1e293b;text-align:left;vertical-align:top}
+th{color:#93a4c3}code{font-family:ui-monospace,monospace;color:#38bdf8}
+</style></head><body><div class="wrap">
+<div class="card"><h1>mcstage Server Config &amp; JVM Preflight Report (MCS022)</h1>
+<p>Grade: <b style="color:$statusCol">${htmlEsc(report.grade)} (${report.score}/100)</b> &middot; Verdict: <b style="color:$statusCol">${if (report.ok) "PASS" else "FAIL"}</b> &middot; Properties Parsed: <b>${report.propertiesParsed}</b> &middot; JVM Flags: <b>${report.jvmFlagsAnalyzed}</b></p></div>
+<div class="card"><table><thead><tr><th>Code</th><th>Severity</th><th>Key</th><th>Finding</th><th>Recommendation</th></tr></thead>
+<tbody>$rows</tbody></table></div></div></body></html>"""
+    }
 }

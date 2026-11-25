@@ -64,6 +64,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_render_step_summary",
                 "mcstage_export_world_sarif",
                 "mcstage_export_preflight_sarif",
+                "mcstage_export_preflight_html",
                 "mcstage_export_jar_sarif",
                 "mcstage_export_jar_html",
                 "mcstage_export_doctor_badge",
