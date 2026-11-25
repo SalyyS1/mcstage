@@ -4,7 +4,9 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.run.CrashAnalyzer
+import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -19,9 +21,15 @@ class ListRulesCommand : CliktCommand(name = "list-rules") {
         "List all MCStage diagnostic and crash-guard rules (MCS001-MCS023)."
 
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
+    private val badgeJson by option("--badge-json", help = "Write shields.io Endpoint Badge JSON summarizing diagnostic rules").path()
 
     override fun run() {
         val rules = CrashAnalyzer.RULES
+        badgeJson?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            val badge = """{"schemaVersion":1,"label":"mcstage rules","message":"${rules.size} SARIF rules (MCS001-MCS${String.format("%03d", rules.size)})","color":"brightgreen"}"""
+            Files.writeString(target, badge)
+        }
         if (json) {
             val payload = buildJsonObject {
                 put("rule_count", rules.size)

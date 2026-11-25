@@ -82,6 +82,8 @@ class McpServerAndBotProbeTest {
                 "mcstage_export_folia_topology_html",
                 "mcstage_export_folia_badge",
                 "mcstage_export_summary_badge",
+                "mcstage_export_rules_badge",
+                "mcstage_export_scenario_badge",
                 "mcstage_list_rules",
             ),
             toolNames,
@@ -724,5 +726,36 @@ class McpServerAndBotProbeTest {
             probeBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
         ).jsonObject
         assertEquals("mcstage server", probeBadgePayload["badge"]!!.jsonObject["label"]!!.jsonPrimitive.content)
+
+        // Verify v0.55.0 ListRulesCommand --badge-json & MCP tools #37-#38 (rules badge + scenario badge)
+        val rulesBadgeOut = dir.resolve("rules-badge.json")
+        com.salyvn.mcstage.cli.ListRulesCommand().parse(listOf("--badge-json", rulesBadgeOut.toString()))
+        assertTrue(Files.readString(rulesBadgeOut, StandardCharsets.UTF_8).contains("mcstage rules"))
+
+        val rbResp = json.parseToJsonElement(
+            mcp.handleMessage("""{"jsonrpc":"2.0","id":370,"method":"tools/call","params":{"name":"mcstage_export_rules_badge","arguments":{}}}""")!!,
+        ).jsonObject
+        val rbPayload = json.parseToJsonElement(
+            rbResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals(23, rbPayload["rule_count"]!!.jsonPrimitive.int)
+
+        val sbReq = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(380))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_scenario_badge"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("yaml", kotlinx.serialization.json.JsonPrimitive(yamlText))
+                })
+            })
+        }
+        val sbResp = json.parseToJsonElement(mcp.handleMessage(sbReq.toString())!!).jsonObject
+        val sbPayload = json.parseToJsonElement(
+            sbResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertTrue(sbPayload["valid"]!!.jsonPrimitive.boolean)
+        assertEquals("brightgreen", sbPayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
     }
 }

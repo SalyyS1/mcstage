@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>mcstage v0.54.0 | 36-Tool MCP Server, Real-Server Plugin Matrix Builder, Full HTML/SVG/Badge Suite</title>
-  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.54.0: 36-tool stdio MCP server, GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules), CI host-RAM &amp; shard budget calculator with 1-click presets (mcstage budget --html --badge-json), JUnit XML dark-mode HTML &amp; Badge aggregator (mcstage aggregate --html --badge-json), headless SLP probe (mcstage probe --badge-json), pre-boot plugin JAR inspector (MCS023 + HTML/SARIF/Badge), preflight auditor (MCS022 + HTML/SARIF/Badge), world integrity checker (MCS021 + HTML/SARIF/Badge), compare regression diff (MCS020 + HTML/SARIF/Badge), Folia SVG topology (--html --badge-json), and SARIF v2.1.0." />
+  <title>mcstage v0.55.0 | 38-Tool MCP Server, Real-Server Plugin Matrix Builder, Full HTML/SVG/Badge Suite</title>
+  <meta name="description" content="Zero-upload browser builder and simulator for mcstage v0.55.0: 38-tool stdio MCP server, GitHub Action workflow generator CLI (mcstage github-action), rules catalog CLI (mcstage list-rules --badge-json), CI host-RAM &amp; shard budget calculator with 1-click presets (mcstage budget --html --badge-json), JUnit XML dark-mode HTML &amp; Badge aggregator (mcstage aggregate --html --badge-json), headless SLP probe (mcstage probe --badge-json), pre-boot plugin JAR inspector (MCS023 + HTML/SARIF/Badge), preflight auditor (MCS022 + HTML/SARIF/Badge), world integrity checker (MCS021 + HTML/SARIF/Badge), compare regression diff (MCS020 + HTML/SARIF/Badge), Folia SVG topology (--html --badge-json), and SARIF v2.1.0." />
   <style>
     :root {
       --bg: #0b0f17;
@@ -287,7 +287,7 @@
   <header>
     <div class="wrap">
       <div class="topline">
-        <span class="badge">mcstage v0.54.0 | 36-Tool Stdio MCP · Full HTML/SVG/SARIF/Badge Suite (Probe, Budget, JUnit, World, Preflight, Compare, Folia, Doctor &amp; JAR) · MCS001-MCS023</span>
+        <span class="badge">mcstage v0.55.0 | 38-Tool Stdio MCP · Full HTML/SVG/SARIF/Badge Suite (Scenario, Rules, Probe, Budget, JUnit, World, Preflight, Compare, Folia, Doctor &amp; JAR) · MCS001-MCS023</span>
         <div class="navlinks">
           <a href="https://salyys1.github.io/minecraftkit/showcase.html">MinecraftKit Suite</a>
           <a href="https://github.com/SalyyS1/mcstage">GitHub Repository</a>
@@ -306,7 +306,7 @@
     <button class="tab-btn" id="tabSimBtn" onclick="switchTab('sim')">2. Crash, Recovery &amp; RCON Classifier (MCS001-MCS023)</button>
     <button class="tab-btn" id="tabLabBtn" onclick="switchTab('lab')">3. Folia Region Topology &amp; JUnit XML Aggregator</button>
     <button class="tab-btn" id="tabRconBtn" onclick="switchTab('rcon')">4. RCON Wire &amp; Fault Injection Lab</button>
-    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 36-Tool MCP Server &amp; Report Comparator (MCS020)</button>
+    <button class="tab-btn" id="tabCmpBtn" onclick="switchTab('cmp')">5. 38-Tool MCP Server &amp; Report Comparator (MCS020)</button>
     <button class="tab-btn" id="tabPreflightBtn" onclick="switchTab('preflight')">6. Config Preflight (MCS022) &amp; CI RAM Calculator</button>
   </div>
 
@@ -581,18 +581,18 @@
       </div>
       <div class="card">
         <h2>
-          <span>MCS020 Verdict &amp; 36-Tool Stdio MCP Config</span>
+          <span>MCS020 Verdict &amp; 38-Tool Stdio MCP Config</span>
           <button class="btn" onclick="copyText('mcpCfgOut')">Copy MCP Config</button>
         </h2>
         <div id="cmpVerdict" class="status-box status-ok" style="margin-bottom:10px;">Click Compare Reports to diff baseline vs current.</div>
         <div id="cmpBadgePreview" style="margin-bottom:10px;"></div>
         <pre id="cmpMdOut" style="margin-bottom:14px; max-height:180px;"></pre>
-        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code> — 36 Tools)</label>
+        <label>Claude Code / Cursor / Codex MCP Snippet (<code>mcstage mcp</code> — 38 Tools)</label>
         <pre id="mcpCfgOut">{
   "mcpServers": {
     "mcstage": {
       "command": "java",
-      "args": ["-jar", "mcstage-0.54.0.jar", "mcp"]
+      "args": ["-jar", "mcstage-0.55.0.jar", "mcp"]
     }
   }
 }</pre>
@@ -677,7 +677,7 @@ folia-supported: false</textarea>
   </main>
 
   <footer>
-    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.54.0 (36 MCP Tools) · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
+    Built for <a href="https://github.com/SalyyS1/mcstage">SalyyS1/mcstage</a> v0.55.0 (38 MCP Tools) · Part of the <a href="https://salyys1.github.io/minecraftkit/showcase.html">SalyyS1 MinecraftKit Ecosystem</a>. Runs 100% locally in your browser.
   </footer>
 
   <script>

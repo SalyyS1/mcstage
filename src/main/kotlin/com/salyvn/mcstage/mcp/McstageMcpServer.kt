@@ -148,6 +148,8 @@ class McstageMcpServer {
                 "mcstage_export_folia_topology_html" -> toolExportFoliaTopologyHtml(args)
                 "mcstage_export_folia_badge" -> toolExportFoliaBadge(args)
                 "mcstage_export_summary_badge" -> toolExportSummaryBadge(args)
+                "mcstage_export_rules_badge" -> toolExportRulesBadge()
+                "mcstage_export_scenario_badge" -> toolExportScenarioBadge(args)
                 "mcstage_list_rules" -> toolListRules()
                 else -> return errorResponse(id, -32602, "Unknown tool: $name")
             }
@@ -1070,6 +1072,57 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportRulesBadge(): JsonObject {
+        val count = CrashAnalyzer.RULES.size
+        val badge = buildJsonObject {
+            put("schemaVersion", 1)
+            put("label", "mcstage rules")
+            put("message", "$count SARIF rules (MCS001-MCS${String.format("%03d", count)})")
+            put("color", "brightgreen")
+        }
+        return buildJsonObject {
+            put("rule_count", count)
+            put("badge", badge)
+        }
+    }
+
+    private fun toolExportScenarioBadge(args: JsonObject): JsonObject {
+        val yamlText = args["yaml"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'yaml' string.")
+        val temp = Files.createTempFile("mcstage-scen-badge-", ".yml")
+        return try {
+            Files.writeString(temp, yamlText, StandardCharsets.UTF_8)
+            val scenario = ScenarioFile.read(temp)
+            val badge = buildJsonObject {
+                put("schemaVersion", 1)
+                put("label", "mcstage scenario")
+                put("message", "VALID (${scenario.cases.size} cases · ${scenario.steps.size} steps)")
+                put("color", "brightgreen")
+            }
+            buildJsonObject {
+                put("valid", true)
+                put("name", scenario.name)
+                put("case_count", scenario.cases.size)
+                put("step_count", scenario.steps.size)
+                put("badge", badge)
+            }
+        } catch (e: Exception) {
+            val badge = buildJsonObject {
+                put("schemaVersion", 1)
+                put("label", "mcstage scenario")
+                put("message", "INVALID")
+                put("color", "red")
+            }
+            buildJsonObject {
+                put("valid", false)
+                put("error", e.message ?: "Validation failed")
+                put("badge", badge)
+            }
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
     private fun toolListRules(): JsonObject = buildJsonObject {
         put("rule_count", CrashAnalyzer.RULES.size)
         putJsonArray("rules") {
@@ -1122,6 +1175,8 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_folia_topology_html", "Plan Folia ThreadedRegionizer 16-chunk section anchors and render a dark-mode SVG topology HTML diagram.", emptyList()))
         add(toolDef("mcstage_export_folia_badge", "Plan Folia ThreadedRegionizer 16-chunk section anchors and emit a shields.io Endpoint Badge JSON disjointness payload.", emptyList()))
         add(toolDef("mcstage_export_summary_badge", "Parse a saved mcstage JSON report and return a shields.io Endpoint Badge JSON matrix pass/fail payload.", listOf("report_json")))
+        add(toolDef("mcstage_export_rules_badge", "Emit a shields.io Endpoint Badge JSON summarizing MCStage's OASIS SARIF v2.1.0 diagnostic rules (MCS001-MCS023).", emptyList()))
+        add(toolDef("mcstage_export_scenario_badge", "Validate an mcstage YAML scenario offline and emit a shields.io Endpoint Badge JSON summarizing matrix validity and case count.", listOf("yaml")))
         add(toolDef("mcstage_list_rules", "List all MCStage diagnostic rules (MCS001-MCS023) and crash-guard policies.", emptyList()))
     }
 
@@ -1132,7 +1187,7 @@ class McstageMcpServer {
             put("type", "object")
             putJsonObject("properties") {
                 when (name) {
-                    "mcstage_validate_scenario" -> putJsonObject("yaml") { put("type", "string") }
+                    "mcstage_validate_scenario", "mcstage_export_scenario_badge" -> putJsonObject("yaml") { put("type", "string") }
                     "mcstage_analyze_log" -> {
                         putJsonObject("log") { put("type", "string") }
                         putJsonObject("max_stall_ms") { put("type", "integer") }
