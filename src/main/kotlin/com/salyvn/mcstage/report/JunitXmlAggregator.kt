@@ -298,6 +298,43 @@ class JunitXmlAggregator {
         }
     }.trimEnd()
 
+    fun renderHtml(report: AggregatedReport): String {
+        val verdict = if (report.ok) "PASSED" else "FAILED"
+        val verdictColor = if (report.ok) "#22c55e" else "#ef4444"
+        val suiteRows = report.suites.joinToString("\n") { s ->
+            val ok = s.failures == 0 && s.errors == 0
+            val badgeColor = if (ok) "#22c55e" else "#ef4444"
+            """<tr><td><strong>${escapeAttr(s.name)}</strong></td><td><code>${escapeAttr(s.sourceFile)}</code></td><td style="text-align:right">${s.tests}</td><td style="text-align:right;color:#22c55e">${s.passed}</td><td style="text-align:right;color:${if (s.failures > 0) "#ef4444" else "#93a4c3"}">${s.failures}</td><td style="text-align:right;color:${if (s.errors > 0) "#ef4444" else "#93a4c3"}">${s.errors}</td><td style="text-align:right">${s.skipped}</td><td style="text-align:right">${formatSeconds(s.timeSeconds)}s</td><td><span style="color:$badgeColor;font-weight:700">${if (ok) "PASS" else "FAIL"}</span></td></tr>"""
+        }
+        val broken = report.suites.flatMap { it.cases }
+            .filter { it.status == CaseStatus.FAILED || it.status == CaseStatus.ERRORED }
+        val failureSection = if (broken.isEmpty()) {
+            """<p style="color:#86efac;margin-top:16px">All aggregated test cases passed with zero failures or errors.</p>"""
+        } else {
+            val items = broken.joinToString("\n") { c ->
+                val msg = c.failureMessage?.takeIf { it.isNotBlank() } ?: c.status.name
+                """<li><strong style="color:#f87171">[${c.status}]</strong> <code>${escapeAttr(c.name)}</code> (${escapeAttr(c.suiteName)}, <code>${escapeAttr(c.sourceFile)}</code>): ${escapeAttr(msg)}</li>"""
+            }
+            """<h2 style="margin-top:24px">Failures &amp; Errors (${broken.size})</h2><ul>$items</ul>"""
+        }
+        return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>MCStage JUnit Matrix Report — ${escapeAttr(report.name)}</title>
+<style>body{font-family:system-ui,sans-serif;background:#0b0f17;color:#e6edf7;margin:0;padding:28px;max-width:1100px;margin:0 auto}h1{margin:0 0 8px}code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}.pill{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;background:rgba(255,255,255,0.06);border:1px solid $verdictColor;color:$verdictColor}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:18px 0}.card{background:#121826;border:1px solid #26324d;border-radius:8px;padding:12px}.card small{color:#93a4c3;display:block;font-size:11px;text-transform:uppercase}.card strong{font-size:22px;font-family:ui-monospace,Consolas,monospace}table{width:100%;border-collapse:collapse;background:#121826;border:1px solid #26324d;border-radius:8px;overflow:hidden}th,td{padding:9px 12px;border-bottom:1px solid #26324d;font-size:13px;text-align:left}th{background:#172033;color:#93a4c3;font-size:11px;text-transform:uppercase}</style>
+</head><body>
+<h1>MCStage JUnit Matrix Report: ${escapeAttr(report.name)}</h1>
+<p><span class="pill">$verdict</span> &nbsp; <span style="color:#93a4c3">${report.filesScanned.size} XML file(s) · ${report.suites.size} suite(s) · ${formatSeconds(report.timeSeconds)}s total</span></p>
+<div class="cards">
+<div class="card"><small>Total Cases</small><strong>${report.tests}</strong></div>
+<div class="card"><small>Passed</small><strong style="color:#22c55e">${report.passed}</strong></div>
+<div class="card"><small>Failed</small><strong style="color:${if (report.failures > 0) "#ef4444" else "#e6edf7"}">${report.failures}</strong></div>
+<div class="card"><small>Errors</small><strong style="color:${if (report.errors > 0) "#ef4444" else "#e6edf7"}">${report.errors}</strong></div>
+<div class="card"><small>Skipped</small><strong>${report.skipped}</strong></div>
+</div>
+<table><thead><tr><th>Suite</th><th>Source</th><th style="text-align:right">Tests</th><th style="text-align:right">Pass</th><th style="text-align:right">Fail</th><th style="text-align:right">Err</th><th style="text-align:right">Skip</th><th style="text-align:right">Time</th><th>Status</th></tr></thead><tbody>$suiteRows</tbody></table>
+$failureSection
+</body></html>"""
+    }
+
     private fun StringBuilder.renderTestCaseXml(tc: AggregatedCase) {
         appendLine(
             """    <testcase classname="${escapeAttr(tc.className)}" name="${escapeAttr(tc.name)}" """ +

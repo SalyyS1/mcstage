@@ -122,6 +122,7 @@ class McstageMcpServer {
                 "mcstage_doctor" -> toolDoctor(args)
                 "mcstage_probe_server" -> toolProbeServer(args)
                 "mcstage_aggregate_junit" -> toolAggregateJunit(args)
+                "mcstage_export_junit_html" -> toolExportJunitHtml(args)
                 "mcstage_audit_server_config" -> toolAuditServerConfig(args)
                 "mcstage_inspect_plugin_jar" -> toolInspectPluginJar(args)
                 "mcstage_render_comparison_html" -> toolRenderComparisonHtml(args)
@@ -420,6 +421,27 @@ class McstageMcpServer {
         return buildJsonObject {
             for ((k, v) in parsed) put(k, v)
             put("markdown", agg.renderMarkdown(rep))
+        }
+    }
+
+    private fun toolExportJunitHtml(args: JsonObject): JsonObject {
+        val rawInputs = args["inputs"]?.let { el ->
+            (el as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
+        } ?: throw IllegalArgumentException("Missing required 'inputs' array of JUnit XML paths/dirs/globs.")
+        val suiteName = args["name"]?.jsonPrimitive?.contentOrNull?.ifBlank { "mcstage-aggregated" } ?: "mcstage-aggregated"
+        val agg = com.salyvn.mcstage.report.JunitXmlAggregator()
+        val files = agg.discoverXmlFiles(rawInputs)
+        val rep = agg.aggregateFiles(files, name = suiteName)
+        val html = agg.renderHtml(rep)
+        return buildJsonObject {
+            put("name", rep.name)
+            put("ok", rep.ok)
+            put("tests", rep.tests)
+            put("passed", rep.passed)
+            put("failures", rep.failures)
+            put("errors", rep.errors)
+            put("html_bytes", html.length)
+            put("html", html)
         }
     }
 
@@ -915,6 +937,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_doctor", "Inspect local Java 21+ runtime, JAR cache health, loopback port availability, and optional companion mckit-bridge-plugin readiness.", emptyList()))
         add(toolDef("mcstage_probe_server", "Run a pure-JVM Minecraft Java Edition Server List Ping (SLP) handshake probe against a live server (MCS018).", listOf("host")))
         add(toolDef("mcstage_aggregate_junit", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) into a unified JSON + Markdown summary with XXE hardening.", listOf("inputs")))
+        add(toolDef("mcstage_export_junit_html", "Aggregate sharded JUnit XML matrix reports (files, directories, or globs) and render a self-contained dark-mode HTML JUnit Report with XXE hardening.", listOf("inputs")))
         add(toolDef("mcstage_audit_server_config", "Run static preflight security & performance audit on server.properties and JVM flags (MCS022, A-F grade).", emptyList()))
         add(toolDef("mcstage_inspect_plugin_jar", "Inspect a compiled Minecraft plugin JAR (paper-plugin.yml/plugin.yml, main .class presence, JVM bytecode major version, Folia flag, MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_render_comparison_html", "Render a self-contained dark-mode HTML baseline-vs-current regression diff artifact from two mcstage JSON reports.", listOf("baseline_json", "current_json")))
@@ -977,7 +1000,7 @@ class McstageMcpServer {
                         putJsonObject("port") { put("type", "integer") }
                         putJsonObject("timeout_ms") { put("type", "integer") }
                     }
-                    "mcstage_aggregate_junit" -> {
+                    "mcstage_aggregate_junit", "mcstage_export_junit_html" -> {
                         putJsonObject("inputs") { put("type", "array") }
                         putJsonObject("name") { put("type", "string") }
                     }

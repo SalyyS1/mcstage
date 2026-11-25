@@ -56,6 +56,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_doctor",
                 "mcstage_probe_server",
                 "mcstage_aggregate_junit",
+                "mcstage_export_junit_html",
                 "mcstage_audit_server_config",
                 "mcstage_inspect_plugin_jar",
                 "mcstage_render_comparison_html",
@@ -574,5 +575,39 @@ class McpServerAndBotProbeTest {
             com.salyvn.mcstage.cli.ProbeCommand().parse(listOf("127.0.0.1", "--port", port.toString(), "--json"))
             worker.join(3000)
         }
+
+        // Verify AggregateCommand --html and MCP mcstage_export_junit_html (v0.48.0)
+        val junitFile = dir.resolve("sample-junit.xml")
+        val junitHtmlOut = dir.resolve("junit-report.html")
+        Files.writeString(
+            junitFile,
+            """<?xml version="1.0" encoding="UTF-8"?><testsuite name="paper-1.21.4" tests="2" failures="1" errors="0" skipped="0" time="1.250"><testcase classname="qa" name="boot" time="0.750"/><testcase classname="qa" name="shop_gui" time="0.500"><failure message="Title mismatch"/></testcase></testsuite>""",
+            StandardCharsets.UTF_8,
+        )
+        com.salyvn.mcstage.cli.AggregateCommand().parse(listOf(junitFile.toString(), "--html", junitHtmlOut.toString()))
+        val junitHtml = Files.readString(junitHtmlOut, StandardCharsets.UTF_8)
+        assertTrue(junitHtml.contains("<!doctype html>"))
+        assertTrue(junitHtml.contains("Title mismatch"))
+
+        val mcp = McstageMcpServer()
+        val junitReq = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(280))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_junit_html"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("inputs", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive(junitFile.toString())) })
+                    put("name", kotlinx.serialization.json.JsonPrimitive("matrix-smoke"))
+                })
+            })
+        }
+        val junitResp = json.parseToJsonElement(mcp.handleMessage(junitReq.toString())!!).jsonObject
+        val junitPayload = json.parseToJsonElement(
+            junitResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals(2, junitPayload["tests"]!!.jsonPrimitive.int)
+        assertEquals(1, junitPayload["failures"]!!.jsonPrimitive.int)
+        assertTrue(junitPayload["html"]!!.jsonPrimitive.content.contains("matrix-smoke"))
     }
 }

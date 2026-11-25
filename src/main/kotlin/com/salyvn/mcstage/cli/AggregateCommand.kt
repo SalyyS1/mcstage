@@ -36,12 +36,17 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
     private val format by option(
         "--format",
         help = "Primary output format",
-    ).choice("junit", "json", "markdown").default("junit")
+    ).choice("junit", "json", "markdown", "html").default("junit")
 
     private val output by option(
         "-o",
         "--output",
         help = "Write the merged primary report to this file",
+    ).path()
+
+    private val htmlOutput by option(
+        "--html",
+        help = "Write a self-contained dark-mode HTML JUnit matrix report to this path",
     ).path()
 
     private val summaryMarkdown by option(
@@ -62,7 +67,7 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
     override fun run() {
         try {
             val aggregator = JunitXmlAggregator()
-            val excluded = setOfNotNull(output, summaryMarkdown)
+            val excluded = setOfNotNull(output, summaryMarkdown, htmlOutput)
             val files = aggregator.discoverXmlFiles(inputs, excludePaths = excluded)
             if (files.isEmpty() && !allowEmpty) {
                 throw SetupError("No JUnit XML files matched inputs: ${inputs.joinToString(", ")}.")
@@ -72,7 +77,14 @@ class AggregateCommand : CliktCommand(name = "aggregate") {
             val primaryText = when (format) {
                 "json" -> aggregator.renderJson(report)
                 "markdown" -> aggregator.renderMarkdown(report)
+                "html" -> aggregator.renderHtml(report)
                 else -> aggregator.renderXml(report)
+            }
+
+            htmlOutput?.let { htmlPath ->
+                htmlPath.parent?.let { Files.createDirectories(it) }
+                val html = if (format == "html") primaryText else aggregator.renderHtml(report)
+                Files.writeString(htmlPath, html)
             }
 
             summaryMarkdown?.let { mdPath ->
