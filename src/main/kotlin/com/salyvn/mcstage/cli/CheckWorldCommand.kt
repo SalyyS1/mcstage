@@ -27,6 +27,7 @@ class CheckWorldCommand : CliktCommand(name = "check-world") {
     private val requireUnlocked by option("--require-unlocked", help = "Fail if stale session.lock is still present").flag()
     private val sarif by option("--sarif", help = "Write OASIS SARIF v2.1.0 Code Scanning report (MCS021)").path()
     private val html by option("--html", help = "Write self-contained dark-mode HTML world integrity report (MCS021)").path()
+    private val badgeJson by option("--badge-json", help = "Write shields.io Endpoint Badge JSON summarizing world integrity").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -34,6 +35,10 @@ class CheckWorldCommand : CliktCommand(name = "check-world") {
         html?.let { target ->
             target.parent?.let { Files.createDirectories(it) }
             Files.writeString(target, WorldIntegrityChecker.renderHtml(report))
+        }
+        badgeJson?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            Files.writeString(target, WorldIntegrityChecker.renderBadgeJson(report))
         }
         sarif?.let { target ->
             target.parent?.let { Files.createDirectories(it) }

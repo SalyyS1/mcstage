@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.salyvn.mcstage"
-version = "0.48.0"
+version = "0.49.0"
 
 repositories {
     mavenCentral()

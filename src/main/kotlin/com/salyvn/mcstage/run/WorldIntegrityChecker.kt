@@ -156,6 +156,16 @@ object WorldIntegrityChecker {
     private fun escHtml(raw: String): String =
         raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
+    fun renderBadgeJson(report: WorldIntegrityReport): String {
+        val color = if (report.ok) "brightgreen" else "red"
+        val msg = if (report.ok) {
+            "PASS (${report.regionFilesScanned} regions, ${report.validChunkHeaders} chunks)"
+        } else {
+            "FAIL (${report.issues.size} issue(s))"
+        }
+        return """{"schemaVersion":1,"label":"mcstage world","message":"$msg","color":"$color"}"""
+    }
+
     fun renderHtml(report: WorldIntegrityReport): String {
         val statusColor = if (report.ok) "#22c55e" else "#ef4444"
         val rows = if (report.issues.isEmpty()) {
