@@ -64,6 +64,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_export_compare_badge",
                 "mcstage_estimate_matrix_budget",
                 "mcstage_export_budget_html",
+                "mcstage_export_budget_badge",
                 "mcstage_generate_github_action",
                 "mcstage_render_step_summary",
                 "mcstage_export_world_sarif",
@@ -679,5 +680,31 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertTrue(cmpBadgePayload["ok"]!!.jsonPrimitive.boolean)
         assertEquals("brightgreen", cmpBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        // Verify v0.53.0 BudgetCommand --badge-json & 35th MCP Tool mcstage_export_budget_badge
+        val budgetYaml = dir.resolve("budget-smoke.yml")
+        val budgetBadgeOut = dir.resolve("budget-badge.json")
+        val yamlText = "name: budget-smoke\nplatforms: [paper, folia]\nversions: [\"1.21.4\"]\nmemory: 2G\nsteps:\n  - enabled: Demo\n"
+        Files.writeString(budgetYaml, yamlText, StandardCharsets.UTF_8)
+        com.salyvn.mcstage.cli.BudgetCommand().parse(listOf(budgetYaml.toString(), "--badge-json", budgetBadgeOut.toString()))
+        assertTrue(Files.readString(budgetBadgeOut, StandardCharsets.UTF_8).contains("mcstage budget"))
+
+        val budBadgeReq = kotlinx.serialization.json.buildJsonObject {
+            put("jsonrpc", kotlinx.serialization.json.JsonPrimitive("2.0"))
+            put("id", kotlinx.serialization.json.JsonPrimitive(350))
+            put("method", kotlinx.serialization.json.JsonPrimitive("tools/call"))
+            put("params", kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive("mcstage_export_budget_badge"))
+                put("arguments", kotlinx.serialization.json.buildJsonObject {
+                    put("yaml", kotlinx.serialization.json.JsonPrimitive(yamlText))
+                })
+            })
+        }
+        val budBadgeResp = json.parseToJsonElement(mcp.handleMessage(budBadgeReq.toString())!!).jsonObject
+        val budBadgePayload = json.parseToJsonElement(
+            budBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals(2, budBadgePayload["case_count"]!!.jsonPrimitive.int)
+        assertEquals("brightgreen", budBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
     }
 }

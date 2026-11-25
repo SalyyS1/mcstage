@@ -98,6 +98,17 @@ object MatrixEstimator {
     private fun escHtml(raw: String): String =
         raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
+    /** Render a shields.io Endpoint Badge JSON summarizing CI matrix RAM & shard budget readiness. */
+    fun renderBadgeJson(est: Estimate): String {
+        val color = when {
+            est.warnings.isEmpty() -> "brightgreen"
+            est.warnings.any { it.contains("exceeds safe budget") } -> "red"
+            else -> "yellow"
+        }
+        val msg = "${est.caseCount} cases · ${est.peakRamMb}MB peak · ${est.recommendedShards} shard(s)"
+        return """{"schemaVersion":1,"label":"mcstage budget","message":"$msg","color":"$color"}"""
+    }
+
     fun renderHtml(est: Estimate): String {
         val speedup = if (est.estimatedParallelSeconds > 0) {
             String.format(java.util.Locale.ROOT, "%.1fx", est.estimatedSerialSeconds.toDouble() / est.estimatedParallelSeconds.toDouble())

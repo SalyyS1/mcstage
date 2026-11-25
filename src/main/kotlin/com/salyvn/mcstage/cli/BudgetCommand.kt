@@ -28,6 +28,7 @@ class BudgetCommand : CliktCommand(name = "budget") {
     private val hostRamGb by option("--host-ram-gb", help = "CI runner host RAM in GB (default: 7.0)").double().default(7.0)
     private val maxShards by option("--max-shards", help = "Maximum parallel CI shards (default: 4)").int().default(4)
     private val html by option("--html", help = "Write self-contained dark-mode HTML CI budget report").path()
+    private val badgeJson by option("--badge-json", help = "Write shields.io Endpoint Badge JSON summary").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -36,6 +37,10 @@ class BudgetCommand : CliktCommand(name = "budget") {
         html?.let { target ->
             target.parent?.let { java.nio.file.Files.createDirectories(it) }
             java.nio.file.Files.writeString(target, MatrixEstimator.renderHtml(est))
+        }
+        badgeJson?.let { target ->
+            target.parent?.let { java.nio.file.Files.createDirectories(it) }
+            java.nio.file.Files.writeString(target, MatrixEstimator.renderBadgeJson(est))
         }
         if (json) {
             echo(PRETTY_JSON.encodeToString(MatrixEstimator.toJson(est)))

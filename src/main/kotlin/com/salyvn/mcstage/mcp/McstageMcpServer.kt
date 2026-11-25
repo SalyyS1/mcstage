@@ -130,6 +130,7 @@ class McstageMcpServer {
                 "mcstage_export_compare_badge" -> toolExportCompareBadge(args)
                 "mcstage_estimate_matrix_budget" -> toolEstimateMatrixBudget(args)
                 "mcstage_export_budget_html" -> toolExportBudgetHtml(args)
+                "mcstage_export_budget_badge" -> toolExportBudgetBadge(args)
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
                 "mcstage_render_step_summary" -> toolRenderStepSummary(args)
                 "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
@@ -895,6 +896,30 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportBudgetBadge(args: JsonObject): JsonObject {
+        val yaml = args["yaml"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'yaml' string.")
+        val hostRamGb = args["host_ram_gb"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() ?: 7.0
+        val maxShards = (args["max_shards"]?.jsonPrimitive?.intOrNull ?: 4).coerceIn(1, 16)
+        val temp = Files.createTempFile("mcstage-budget-badge-", ".yml")
+        val est = try {
+            Files.writeString(temp, yaml, StandardCharsets.UTF_8)
+            val scenario = ScenarioFile.read(temp)
+            com.salyvn.mcstage.run.MatrixEstimator.estimate(scenario, hostRamGb = hostRamGb, maxShards = maxShards)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+        val badgeObj = json.parseToJsonElement(com.salyvn.mcstage.run.MatrixEstimator.renderBadgeJson(est)).jsonObject
+        return buildJsonObject {
+            put("scenario", est.scenarioName)
+            put("case_count", est.caseCount)
+            put("peak_ram_mb", est.peakRamMb)
+            put("recommended_shards", est.recommendedShards)
+            put("warning_count", est.warnings.size)
+            put("badge", badgeObj)
+        }
+    }
+
     private fun toolExportDoctorBadge(args: JsonObject): JsonObject {
         val port = (args["port"]?.jsonPrimitive?.intOrNull ?: 25565).coerceIn(1, 65535)
         val bridgeUrl = args["bridge_url"]?.jsonPrimitive?.contentOrNull
@@ -1059,6 +1084,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_compare_badge", "Compare baseline vs current mcstage JSON reports and emit a shields.io Endpoint Badge JSON regression payload (MCS020).", listOf("baseline_json", "current_json")))
         add(toolDef("mcstage_estimate_matrix_budget", "Estimate CI peak RAM, JAR cache footprint, serial vs parallel duration, and optimal GitHub Actions shard split for an mcstage.yml scenario.", listOf("yaml")))
         add(toolDef("mcstage_export_budget_html", "Estimate CI peak RAM, JAR cache, and shard split for an mcstage.yml scenario and render a dark-mode HTML Budget Report.", listOf("yaml")))
+        add(toolDef("mcstage_export_budget_badge", "Estimate CI peak RAM, JAR cache, and shard split for an mcstage.yml scenario and emit a shields.io Endpoint Badge JSON payload.", listOf("yaml")))
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
         add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
         add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
@@ -1138,7 +1164,7 @@ class McstageMcpServer {
                         putJsonObject("current_json") { put("type", "string") }
                         putJsonObject("max_slowdown_pct") { put("type", "number") }
                     }
-                    "mcstage_estimate_matrix_budget", "mcstage_export_budget_html" -> {
+                    "mcstage_estimate_matrix_budget", "mcstage_export_budget_html", "mcstage_export_budget_badge" -> {
                         putJsonObject("yaml") { put("type", "string") }
                         putJsonObject("host_ram_gb") { put("type", "number") }
                         putJsonObject("max_shards") { put("type", "integer") }
