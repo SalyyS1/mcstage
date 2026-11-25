@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "io.github.SalyyS1/mcstage",
-  "description": "Real-server Minecraft plugin integration test runner, DevOps CLI (aggregate --html, budget --html, probe, analyze-log, plan-folia --html, summary, github-action, inspect-jar --html/--sarif/--badge-json, preflight --html/--sarif, check-world --html/--sarif/--badge-json, doctor --html/--badge-json) & 30-tool stdio MCP server milestone for Paper, Folia, and Purpur with HTML/SVG reports, JUnit XML aggregator, MCS001-MCS023 crash-guard & SARIF v2.1.0.",
-  "version": "0.50.0",
+  "description": "Real-server Minecraft plugin integration test runner, DevOps CLI (aggregate --html, budget --html, probe, analyze-log, plan-folia --html, summary, github-action, inspect-jar --html/--sarif/--badge-json, preflight --html/--sarif/--badge-json, check-world --html/--sarif/--badge-json, doctor --html/--badge-json) & 31-tool stdio MCP server for Paper, Folia, and Purpur with HTML/SVG reports, JUnit XML aggregator, MCS001-MCS023 crash-guard & SARIF v2.1.0.",
+  "version": "0.51.0",
   "repository": {
     "url": "https://github.com/SalyyS1/mcstage",
     "source": "github"

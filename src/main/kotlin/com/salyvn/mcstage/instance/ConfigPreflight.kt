@@ -249,6 +249,17 @@ object ConfigPreflight {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
 
+    /** Render a shields.io Endpoint Badge JSON summarizing server.properties & JVM preflight grade (MCS022). */
+    fun renderBadgeJson(report: Report): String {
+        val color = when (report.grade) {
+            "A", "B" -> "brightgreen"
+            "C" -> "yellow"
+            else -> "red"
+        }
+        val msg = "Grade ${report.grade} (${report.score}/100, ${report.issues.size} issue(s))"
+        return """{"schemaVersion":1,"label":"mcstage preflight","message":"$msg","color":"$color"}"""
+    }
+
     /** Render a self-contained dark-mode HTML Server Config Preflight Report (`preflight --html`). */
     fun renderHtml(report: Report): String {
         val statusCol = if (report.ok) "#22c55e" else "#ef4444"

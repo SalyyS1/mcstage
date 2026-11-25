@@ -135,6 +135,7 @@ class McstageMcpServer {
                 "mcstage_export_world_badge" -> toolExportWorldBadge(args)
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_export_preflight_html" -> toolExportPreflightHtml(args)
+                "mcstage_export_preflight_badge" -> toolExportPreflightBadge(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
                 "mcstage_export_jar_html" -> toolExportJarHtml(args)
                 "mcstage_export_jar_badge" -> toolExportJarBadge(args)
@@ -780,6 +781,27 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportPreflightBadge(args: JsonObject): JsonObject {
+        val propsText = args["server_properties"]?.jsonPrimitive?.contentOrNull
+        val serverDir = args["server_dir"]?.jsonPrimitive?.contentOrNull
+        val jvmFlags = (args["jvm_flags"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?: emptyList()
+        val rep = when {
+            propsText != null -> com.salyvn.mcstage.instance.ConfigPreflight.audit(propsText, jvmFlags)
+            !serverDir.isNullOrBlank() -> com.salyvn.mcstage.instance.ConfigPreflight.auditDirectory(java.nio.file.Path.of(serverDir), jvmFlags)
+            else -> throw IllegalArgumentException("Provide either 'server_properties' text or 'server_dir' path.")
+        }
+        val badgeObj = json.parseToJsonElement(com.salyvn.mcstage.instance.ConfigPreflight.renderBadgeJson(rep)).jsonObject
+        return buildJsonObject {
+            put("ok", rep.ok)
+            put("grade", rep.grade)
+            put("score", rep.score)
+            put("issue_count", rep.issues.size)
+            put("badge", badgeObj)
+        }
+    }
+
     private fun toolExportJarHtml(args: JsonObject): JsonObject {
         val jarStr = args["jar_path"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("Missing required 'jar_path' string.")
@@ -984,6 +1006,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_export_world_badge", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and emit a shields.io Endpoint Badge JSON readiness payload (MCS021).", listOf("world_dir")))
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_export_preflight_html", "Audit server.properties and JVM flags and render a self-contained dark-mode HTML preflight report (MCS022).", emptyList()))
+        add(toolDef("mcstage_export_preflight_badge", "Audit server.properties and JVM flags and emit a shields.io Endpoint Badge JSON preflight grade payload (MCS022).", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
         add(toolDef("mcstage_export_jar_html", "Inspect a compiled Minecraft plugin JAR and render a self-contained dark-mode HTML report (MCS023).", listOf("jar_path")))
         add(toolDef("mcstage_export_jar_badge", "Inspect a compiled Minecraft plugin JAR and emit a shields.io Endpoint Badge JSON readiness payload (MCS023).", listOf("jar_path")))
@@ -1071,7 +1094,7 @@ class McstageMcpServer {
                         putJsonObject("world_dir") { put("type", "string") }
                         putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
                     }
-                    "mcstage_export_preflight_sarif", "mcstage_export_preflight_html" -> {
+                    "mcstage_export_preflight_sarif", "mcstage_export_preflight_html", "mcstage_export_preflight_badge" -> {
                         putJsonObject("server_properties") { put("type", "string") }
                         putJsonObject("server_dir") { put("type", "string") }
                         putJsonObject("jvm_flags") { put("type", "array") }
