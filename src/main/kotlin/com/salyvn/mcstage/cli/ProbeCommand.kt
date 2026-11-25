@@ -10,7 +10,9 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
+import com.github.ajalt.clikt.parameters.types.path
 import com.salyvn.mcstage.protocol.MinecraftSlpProbe
+import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -27,6 +29,7 @@ class ProbeCommand : CliktCommand(name = "probe") {
     private val host by argument("host", help = "Server host or IP (default: 127.0.0.1)").default("127.0.0.1")
     private val port by option("--port", "-p", help = "Server TCP port (default: 25565)").int().default(25565)
     private val timeoutMs by option("--timeout-ms", help = "Connect/read timeout in ms (default: 3000)").long().default(3000L)
+    private val badgeJson by option("--badge-json", help = "Write shields.io Endpoint Badge JSON server status payload").path()
     private val json by option("--json", help = "Emit machine-readable JSON output").flag()
 
     override fun run() {
@@ -35,6 +38,10 @@ class ProbeCommand : CliktCommand(name = "probe") {
             port = port,
             timeout = Duration.ofMillis(timeoutMs.coerceIn(200L, 15_000L)),
         )
+        badgeJson?.let { target ->
+            target.parent?.let { Files.createDirectories(it) }
+            Files.writeString(target, MinecraftSlpProbe.renderBadgeJson(res))
+        }
         if (json) {
             val payload = buildJsonObject {
                 put("reachable", res.reachable)

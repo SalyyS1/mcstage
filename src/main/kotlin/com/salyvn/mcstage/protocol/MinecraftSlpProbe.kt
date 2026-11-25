@@ -111,6 +111,22 @@ object MinecraftSlpProbe {
         }
     }
 
+    /** Render a shields.io Endpoint Badge JSON summarizing live Minecraft Java SLP reachability & RTT ms (MCS018). */
+    fun renderBadgeJson(res: Result): String {
+        val color = when {
+            !res.reachable -> "red"
+            res.latencyMillis > 250L -> "yellow"
+            else -> "brightgreen"
+        }
+        val msg = if (res.reachable) {
+            val players = "${res.onlinePlayers ?: 0}/${res.maxPlayers ?: 0}"
+            "ONLINE (${res.latencyMillis}ms · $players)"
+        } else {
+            "OFFLINE"
+        }
+        return """{"schemaVersion":1,"label":"mcstage server","message":"$msg","color":"$color"}"""
+    }
+
     internal fun framePacket(payload: ByteArray): ByteArray = ByteArrayOutputStream().apply {
         writeVarInt(this, payload.size)
         write(payload)

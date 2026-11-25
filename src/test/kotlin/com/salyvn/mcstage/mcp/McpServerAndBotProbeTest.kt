@@ -55,6 +55,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_check_world_integrity",
                 "mcstage_doctor",
                 "mcstage_probe_server",
+                "mcstage_export_probe_badge",
                 "mcstage_aggregate_junit",
                 "mcstage_export_junit_html",
                 "mcstage_export_junit_badge",
@@ -706,5 +707,22 @@ class McpServerAndBotProbeTest {
         ).jsonObject
         assertEquals(2, budBadgePayload["case_count"]!!.jsonPrimitive.int)
         assertEquals("brightgreen", budBadgePayload["badge"]!!.jsonObject["color"]!!.jsonPrimitive.content)
+
+        // Verify v0.54.0 MinecraftSlpProbe.renderBadgeJson & 36th MCP Tool mcstage_export_probe_badge
+        val offlineBadgeJson = com.salyvn.mcstage.protocol.MinecraftSlpProbe.renderBadgeJson(
+            com.salyvn.mcstage.protocol.MinecraftSlpProbe.Result(reachable = false, latencyMillis = 12, error = "refused"),
+        )
+        assertTrue(offlineBadgeJson.contains("OFFLINE"))
+        val onlineBadgeJson = com.salyvn.mcstage.protocol.MinecraftSlpProbe.renderBadgeJson(
+            com.salyvn.mcstage.protocol.MinecraftSlpProbe.Result(reachable = true, latencyMillis = 18, onlinePlayers = 4, maxPlayers = 50),
+        )
+        assertTrue(onlineBadgeJson.contains("ONLINE (18ms · 4/50)"))
+        val probeBadgeResp = json.parseToJsonElement(
+            mcp.handleMessage("""{"jsonrpc":"2.0","id":360,"method":"tools/call","params":{"name":"mcstage_export_probe_badge","arguments":{"host":"127.0.0.1","port":1,"timeout_ms":250}}}""")!!,
+        ).jsonObject
+        val probeBadgePayload = json.parseToJsonElement(
+            probeBadgeResp["result"]!!.jsonObject["content"]!!.jsonArray[0].jsonObject["text"]!!.jsonPrimitive.content,
+        ).jsonObject
+        assertEquals("mcstage server", probeBadgePayload["badge"]!!.jsonObject["label"]!!.jsonPrimitive.content)
     }
 }
