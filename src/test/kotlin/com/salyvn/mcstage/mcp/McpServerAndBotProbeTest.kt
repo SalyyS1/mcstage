@@ -63,6 +63,7 @@ class McpServerAndBotProbeTest {
                 "mcstage_generate_github_action",
                 "mcstage_render_step_summary",
                 "mcstage_export_world_sarif",
+                "mcstage_export_world_html",
                 "mcstage_export_preflight_sarif",
                 "mcstage_export_preflight_html",
                 "mcstage_export_jar_sarif",
@@ -486,7 +487,9 @@ class McpServerAndBotProbeTest {
         gzipHeader[1] = 0x8B.toByte()
         Files.write(world.resolve("level.dat"), gzipHeader)
         Files.write(world.resolve("region/r.0.0.mca"), ByteArray(8192))
-        com.salyvn.mcstage.cli.CheckWorldCommand().parse(listOf(world.toString(), "--require-unlocked", "--json"))
+        val worldHtml = dir.resolve("world-integrity.html")
+        com.salyvn.mcstage.cli.CheckWorldCommand().parse(listOf(world.toString(), "--require-unlocked", "--html", worldHtml.toString(), "--json"))
+        assertTrue(Files.readString(worldHtml, StandardCharsets.UTF_8).contains("Anvil World Integrity Report"))
 
         for (preset in listOf("basic", "folia-stress", "rpg-bot-bridge", "ci-matrix")) {
             val out = dir.resolve("preset-$preset.yml")

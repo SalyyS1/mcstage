@@ -129,6 +129,7 @@ class McstageMcpServer {
                 "mcstage_generate_github_action" -> toolGenerateGithubAction(args)
                 "mcstage_render_step_summary" -> toolRenderStepSummary(args)
                 "mcstage_export_world_sarif" -> toolExportWorldSarif(args)
+                "mcstage_export_world_html" -> toolExportWorldHtml(args)
                 "mcstage_export_preflight_sarif" -> toolExportPreflightSarif(args)
                 "mcstage_export_preflight_html" -> toolExportPreflightHtml(args)
                 "mcstage_export_jar_sarif" -> toolExportJarSarif(args)
@@ -772,6 +773,22 @@ class McstageMcpServer {
         }
     }
 
+    private fun toolExportWorldHtml(args: JsonObject): JsonObject {
+        val dirStr = args["world_dir"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("Missing required 'world_dir' string.")
+        val requireUnlocked = args["require_session_lock_cleared"]?.jsonPrimitive?.booleanOrNull ?: false
+        val rep = com.salyvn.mcstage.run.WorldIntegrityChecker.inspect(java.nio.file.Path.of(dirStr), requireSessionLockCleared = requireUnlocked)
+        val html = com.salyvn.mcstage.run.WorldIntegrityChecker.renderHtml(rep)
+        return buildJsonObject {
+            put("ok", rep.ok)
+            put("region_files_scanned", rep.regionFilesScanned)
+            put("valid_chunk_headers", rep.validChunkHeaders)
+            put("issue_count", rep.issues.size)
+            put("html_bytes", html.length)
+            put("html", html)
+        }
+    }
+
     private fun toolExportDoctorBadge(args: JsonObject): JsonObject {
         val port = (args["port"]?.jsonPrimitive?.intOrNull ?: 25565).coerceIn(1, 65535)
         val bridgeUrl = args["bridge_url"]?.jsonPrimitive?.contentOrNull
@@ -880,6 +897,7 @@ class McstageMcpServer {
         add(toolDef("mcstage_generate_github_action", "Generate a ready-to-commit .github/workflows/mcstage.yml with Java 21, ~/.mcstage JAR caching, dark-mode HTML matrix report upload, and SARIF v2.1.0 Code Scanning.", emptyList()))
         add(toolDef("mcstage_render_step_summary", "Render a saved mcstage JSON report into a GitHub Actions Step Summary Markdown matrix table.", listOf("report_json")))
         add(toolDef("mcstage_export_world_sarif", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and return OASIS SARIF v2.1.0 (MCS021) for Code Scanning.", listOf("world_dir")))
+        add(toolDef("mcstage_export_world_html", "Audit a Minecraft world directory (level.dat, session.lock, Anvil .mca) and render a self-contained dark-mode HTML Integrity Report (MCS021).", listOf("world_dir")))
         add(toolDef("mcstage_export_preflight_sarif", "Audit server.properties and JVM flags and return OASIS SARIF v2.1.0 (MCS022) for GitHub Code Scanning.", emptyList()))
         add(toolDef("mcstage_export_preflight_html", "Audit server.properties and JVM flags and render a self-contained dark-mode HTML preflight report (MCS022).", emptyList()))
         add(toolDef("mcstage_export_jar_sarif", "Inspect a compiled Minecraft plugin JAR and return OASIS SARIF v2.1.0 (MCS023) for pre-boot Code Scanning.", listOf("jar_path")))
@@ -964,7 +982,7 @@ class McstageMcpServer {
                     "mcstage_render_step_summary" -> {
                         putJsonObject("report_json") { put("type", "string") }
                     }
-                    "mcstage_export_world_sarif" -> {
+                    "mcstage_export_world_sarif", "mcstage_export_world_html" -> {
                         putJsonObject("world_dir") { put("type", "string") }
                         putJsonObject("require_session_lock_cleared") { put("type", "boolean") }
                     }
